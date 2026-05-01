@@ -48,8 +48,7 @@ spec:
       containers:
         - name: mongodb
           image: mongo:7.0
-          command:
-            - mongod
+          args:
             - --replSet=rs0
             - --auth
             - --keyFile=/data/keyfile
@@ -66,33 +65,19 @@ spec:
             - name: mongodb
               containerPort: 27017
           livenessProbe:
-            exec:
-              command:
-                - mongosh
-                - --eval
-                - "db.adminCommand('ping')"
-                - --username=root
-                - --password=$(MONGO_INITDB_ROOT_PASSWORD)
-                - --authenticationDatabase=admin
-                - --quiet
-            initialDelaySeconds: 30
+            tcpSocket:
+              port: 27017
+            initialDelaySeconds: 60
             periodSeconds: 20
             timeoutSeconds: 10
             failureThreshold: 3
           readinessProbe:
-            exec:
-              command:
-                - mongosh
-                - --eval
-                - "db.adminCommand('ping')"
-                - --username=root
-                - --password=$(MONGO_INITDB_ROOT_PASSWORD)
-                - --authenticationDatabase=admin
-                - --quiet
+            tcpSocket:
+              port: 27017
             initialDelaySeconds: 15
             periodSeconds: 10
             timeoutSeconds: 5
-            failureThreshold: 3
+            failureThreshold: 6
           resources:
             requests:
               cpu: 100m
