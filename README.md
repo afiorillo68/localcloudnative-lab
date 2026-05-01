@@ -75,6 +75,11 @@ portatile), ma disporre di un ambiente in cui:
   accettando il disallineamento sul deployment model (le interfacce
   applicative restano identiche).
 
+Le decisioni architetturali rilevanti del progetto sono documentate
+come ADR (Architectural Decision Records) in [`docs/adr/`](docs/adr/).
+L'[ADR-001](docs/adr/0001-strategia-gitops.md) raccoglie le otto decisioni
+interdipendenti sulla strategia GitOps adottata.
+
 ## Prerequisiti
 
 ### Hardware
