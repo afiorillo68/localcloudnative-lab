@@ -1,7 +1,8 @@
-# apps/apisix-app.yaml
+# gitops/applications/apisix-app.yaml
 #
 # Application ArgoCD per Apache Apisix (Fase 3).
-# Sospesa fino a quando platform/apisix/ non e' popolata con chart Helm.
+# Punta all'overlay dev di Kustomize: platform/apisix/overlays/dev/.
+# La struttura base + overlays/dev e' predisposta; verra' popolata in Fase 3.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -17,7 +18,7 @@ spec:
   source:
     repoURL: https://github.com/afiorillo68/localcloudnative-lab
     targetRevision: HEAD
-    path: platform/apisix
+    path: platform/apisix/overlays/dev
 
   destination:
     server: https://kubernetes.default.svc

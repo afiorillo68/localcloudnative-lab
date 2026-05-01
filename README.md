@@ -28,6 +28,7 @@ portatile), ma disporre di un ambiente in cui:
 | `gitops/applications/` | Application CR di Argo CD (definizioni dichiarative GitOps) |
 | `workloads/` | Microservizi e frontend applicativi (Fase 4+, attualmente non popolato) |
 | Namespace componenti di piattaforma | Prefisso `platform-` (es. `platform-keycloak`, `platform-apisix`, `platform-mongodb`) per disambiguare dai namespace applicativi futuri (`workloads/`). Eccezione: `argocd` mantiene il nome convenzionale dell'ecosistema upstream. |
+| Struttura Kustomize componenti | `platform/<componente>/base/` + `platform/<componente>/overlays/<env>/` — pattern base+overlays predisposto per ambienti multipli; attualmente solo `dev` e' definito. |
 
 ## Indice
 
@@ -38,6 +39,7 @@ portatile), ma disporre di un ambiente in cui:
 5. [Fase 3 — Platform services (Keycloak, Apisix, MongoDB)](#fase-3--platform-services) *(da fare)*
 6. [Fase 4 — Applicazioni demo (Spring Boot + Angular)](#fase-4--applicazioni-demo) *(da fare)*
 7. [Troubleshooting](#troubleshooting)
+8. [How-to: aggiungere un nuovo ambiente](docs/how-to/add-environment.md)
 
 ---
 
@@ -516,6 +518,7 @@ kubectl config use-context k3d-lcn-lab
 
 - [x] **Fase 1** — Cluster k3d con configurazione versionata *(cluster `lcn-lab` attivo, verificato 2026-05-01)*
 - [x] **Fase 2** — Bootstrap ArgoCD + app-of-apps *(ArgoCD v2.13.3 attivo, app-of-apps pronta per GitHub remote, verificato 2026-05-01)*
+- [x] **Predisposizione struttura base + overlays/dev** *(Fase 3 ready — placeholder Kustomize per keycloak, apisix, mongodb)*
 - [ ] **Fase 3** — Keycloak con realm preconfigurato
 - [ ] **Fase 3** — Apache Apisix come gateway
 - [ ] **Fase 3** — MongoDB Community

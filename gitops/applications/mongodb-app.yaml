@@ -1,7 +1,8 @@
-# apps/mongodb-app.yaml
+# gitops/applications/mongodb-app.yaml
 #
 # Application ArgoCD per MongoDB Community (Fase 3).
-# Sospesa fino a quando platform/mongodb/ non e' popolata con chart Helm.
+# Punta all'overlay dev di Kustomize: platform/mongodb/overlays/dev/.
+# La struttura base + overlays/dev e' predisposta; verra' popolata in Fase 3.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -17,7 +18,7 @@ spec:
   source:
     repoURL: https://github.com/afiorillo68/localcloudnative-lab
     targetRevision: HEAD
-    path: platform/mongodb
+    path: platform/mongodb/overlays/dev
 
   destination:
     server: https://kubernetes.default.svc

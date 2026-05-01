@@ -1,8 +1,9 @@
-# apps/keycloak-app.yaml
+# gitops/applications/keycloak-app.yaml
 #
 # Application ArgoCD per Keycloak (Fase 3).
-# Sospesa fino a quando platform/keycloak/ non e' popolata con chart Helm.
-# Per abilitare: rimuovere spec.info[0] e impostare syncPolicy.automated.
+# Punta all'overlay dev di Kustomize: platform/keycloak/overlays/dev/.
+# La struttura base + overlays/dev e' predisposta; verra' popolata in Fase 3.
+# Per abilitare: popolare platform/keycloak/base/ e impostare syncPolicy.automated.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -18,14 +19,14 @@ spec:
   source:
     repoURL: https://github.com/afiorillo68/localcloudnative-lab
     targetRevision: HEAD
-    path: platform/keycloak
+    path: platform/keycloak/overlays/dev
 
   destination:
     server: https://kubernetes.default.svc
     namespace: platform-keycloak
 
-  # Sospesa: platform/keycloak/ non e' ancora popolata (Fase 3).
-  # Cambiare in `suspended: false` quando la chart Helm e' pronta.
+  # Sospesa: platform/keycloak/base/ non e' ancora popolata (Fase 3).
+  # Cambiare in syncPolicy.automated quando base/ conterra' risorse reali.
   syncPolicy:
     syncOptions:
       - CreateNamespace=true

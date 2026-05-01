@@ -1,0 +1,13 @@
+# platform/apisix/base/kustomization.yaml
+#
+# Base Kustomize per il componente Apache Apisix.
+# Questa cartella conterra' la configurazione comune a tutti gli ambienti
+# (es. helmCharts reference, ConfigMap statiche, RBAC).
+#
+# Stato attuale: PLACEHOLDER. Verra' popolato in Fase 3 con la decisione
+# finale su Helm vs Kustomize (cfr. ADR-001).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Risorse comuni a tutti gli ambienti (vuoto per ora).
+resources: []
