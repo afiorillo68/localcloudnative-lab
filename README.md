@@ -78,7 +78,8 @@ portatile), ma disporre di un ambiente in cui:
 Le decisioni architetturali rilevanti del progetto sono documentate
 come ADR (Architectural Decision Records) in [`docs/adr/`](docs/adr/).
 L'[ADR-001](docs/adr/0001-strategia-gitops.md) raccoglie le otto decisioni
-interdipendenti sulla strategia GitOps adottata.
+interdipendenti sulla strategia GitOps adottata. Le decisioni identificate
+ma non ancora prese sono nel [`docs/adr/BACKLOG.md`](docs/adr/BACKLOG.md).
 
 Il processo decisionale che ha portato a queste scelte e' descritto
 in [`docs/methodology.md`](docs/methodology.md): un documento
@@ -530,6 +531,7 @@ kubectl config use-context k3d-lcn-lab
 - [x] **Fase 1** — Cluster k3d con configurazione versionata *(cluster `lcn-lab` attivo, verificato 2026-05-01)*
 - [x] **Fase 2** — Bootstrap ArgoCD + app-of-apps *(ArgoCD v2.13.3 attivo, app-of-apps pronta per GitHub remote, verificato 2026-05-01)*
 - [x] **Predisposizione struttura base + overlays/dev** *(Fase 3 ready — placeholder Kustomize per keycloak, apisix, mongodb)*
+- [x] **LICENSE, CONTRIBUTING.md, CODE_OF_CONDUCT.md** *(Apache-2.0; Contributor Covenant 2.1 — aggiunti per pubblicazione)*
 - [ ] **Fase 3** — Keycloak con realm preconfigurato
 - [ ] **Fase 3** — Apache Apisix come gateway
 - [ ] **Fase 3** — MongoDB Community
@@ -540,8 +542,26 @@ kubectl config use-context k3d-lcn-lab
 - [ ] Documentazione architetturale (`docs/architecture.md`)
 - [ ] Pubblicazione su GitHub con licenza Apache-2.0
 
+## Contribuire
+
+I contributi sono benvenuti. Leggi [`CONTRIBUTING.md`](CONTRIBUTING.md)
+per le linee guida operative e [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md)
+per il codice di condotta adottato (Contributor Covenant 2.1).
+
+Prima di aprire una pull request, apri una issue per discutere la modifica
+proposta. Se la modifica tocca una decisione architetturale, aggiungi o
+aggiorna un ADR in [`docs/adr/`](docs/adr/).
+
 ## Licenza
 
-*Da definire in fase di pubblicazione su GitHub. Candidata: Apache-2.0
-(piu' adatta per un progetto infrastrutturale che potrebbe contenere
-riferimenti o snippet riconducibili al contesto enterprise).*
+Distribuito sotto licenza [Apache 2.0](LICENSE).
+
+Copyright 2026 Angelo Fiorillo.
+
+```
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+```

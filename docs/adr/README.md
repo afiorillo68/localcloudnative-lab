@@ -43,3 +43,9 @@ Aggiungi un ADR quando:
 Non serve un ADR per scelte tattiche o di implementazione che non
 hanno impatto strutturale (es. la scelta di un nome di variabile,
 la formattazione di un file).
+
+## Backlog
+
+Le decisioni identificate ma non ancora prese sono raccolte in
+[`BACKLOG.md`](BACKLOG.md). Quando una decisione del backlog viene
+ratificata, viene rimossa da li' e formalizzata in un nuovo ADR.
