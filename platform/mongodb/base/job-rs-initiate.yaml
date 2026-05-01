@@ -35,7 +35,7 @@ spec:
       restartPolicy: OnFailure
       containers:
         - name: rs-initiate
-          image: mongo:8.0
+          image: mongo:7.0
           env:
             - name: MONGO_ROOT_PASSWORD
               valueFrom:

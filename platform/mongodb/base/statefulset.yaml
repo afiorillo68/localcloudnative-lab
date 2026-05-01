@@ -47,7 +47,7 @@ spec:
               readOnly: true
       containers:
         - name: mongodb
-          image: mongo:8.0
+          image: mongo:7.0
           command:
             - mongod
             - --replSet=rs0
