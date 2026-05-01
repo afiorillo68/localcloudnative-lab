@@ -1,0 +1,8 @@
+# platform/mongodb/base/namespace.yaml
+#
+# Namespace per MongoDB Community.
+# Riferimento architetturale: ADR-001 D4 (prefisso platform-*)
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: platform-mongodb

@@ -1,0 +1,20 @@
+# platform/mongodb/base/service.yaml
+#
+# Service ClusterIP per l'accesso applicativo a MongoDB.
+# I workload interni usano mongodb.platform-mongodb.svc.cluster.local:27017.
+# Riferimento architetturale: ADR-003 (manifest puri, immagine mongo:8.0)
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb
+  namespace: platform-mongodb
+  labels:
+    app.kubernetes.io/name: mongodb
+    app.kubernetes.io/component: database
+spec:
+  selector:
+    app.kubernetes.io/name: mongodb
+  ports:
+    - name: mongodb
+      port: 27017
+      targetPort: 27017

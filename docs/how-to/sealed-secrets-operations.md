@@ -184,9 +184,13 @@ ripristino fallito della chiave). Soluzioni:
 ## 5. Generazione SealedSecret per MongoDB (Step 3b)
 
 Procedura per generare e committare i SealedSecret necessari al primo
-deploy di MongoDB nello Step 3b della Fase 3. Da eseguire **una sola
-volta** dopo aver completato lo Step 3a (struttura `platform/mongodb/`
-creata, ma Application ancora in attesa).
+deploy di MongoDB con manifest puri (ADR-003). Da eseguire **una sola
+volta** dopo che la struttura `platform/mongodb/` e' in stato
+manifest-puri (Step 3 completato, Application ancora in attesa).
+
+I manifest puri si aspettano:
+- Secret `mongodb-root-credentials`: campi `password` e `replica-set-key`
+- Secret `mongodb-app-credentials`: campo `password`
 
 ### Prerequisiti
 
@@ -194,7 +198,7 @@ creata, ma Application ancora in attesa).
   runbook).
 - Cluster `k3d-lcn-lab` attivo, controller Sealed Secrets in stato
   Running in `platform-sealed-secrets`.
-- Aver scelto due password robuste per gli utenti `root` e `appuser`
+- Aver scelto due password robuste per `root` e `lcnapp`
   (suggerito: generatore del password manager, lunghezza 24+).
 
 ### Passo 1 — Genera il Secret per le credenziali root
@@ -202,8 +206,8 @@ creata, ma Application ancora in attesa).
 ```bash
 # Sostituisci <ROOT_PASSWORD> con la password scelta per l'utente root.
 kubectl create secret generic mongodb-root-credentials \
-  --from-literal=mongodb-root-password='<ROOT_PASSWORD>' \
-  --from-literal=mongodb-replica-set-key="$(openssl rand -base64 756 | tr -d '\n')" \
+  --from-literal=password='<ROOT_PASSWORD>' \
+  --from-literal=replica-set-key="$(openssl rand -base64 756 | tr -d '\n')" \
   --namespace=platform-mongodb \
   --dry-run=client -o yaml > /tmp/mongodb-root-credentials.yaml
 
@@ -217,16 +221,19 @@ kubeseal \
 rm /tmp/mongodb-root-credentials.yaml
 ```
 
-Il `mongodb-replica-set-key` e' una chiave condivisa tra i membri del
-replica set per autenticazione interna. Anche se abbiamo un solo membro,
-il chart la richiede comunque. Generata casualmente e mai riusata.
+`replica-set-key` e' la chiave condivisa usata dal replica set rs0 per
+l'autenticazione interna tra nodi (--keyFile). Generata casualmente con
+`openssl rand -base64 756` (lunghezza raccomandata da MongoDB Inc.).
+Con un solo membro il keyFile non e' strettamente necessario per la
+comunicazione inter-nodo, ma e' richiesto dall'opzione `--auth` +
+`--replSet` in combinazione. Generata casualmente, mai riusata.
 
 ### Passo 2 — Genera il Secret per le credenziali applicative
 
 ```bash
-# Sostituisci <APP_PASSWORD> con la password scelta per appuser.
+# Sostituisci <APP_PASSWORD> con la password scelta per l'utente lcnapp.
 kubectl create secret generic mongodb-app-credentials \
-  --from-literal=mongodb-passwords='<APP_PASSWORD>' \
+  --from-literal=password='<APP_PASSWORD>' \
   --namespace=platform-mongodb \
   --dry-run=client -o yaml > /tmp/mongodb-app-credentials.yaml
 
@@ -240,71 +247,72 @@ kubeseal \
 rm /tmp/mongodb-app-credentials.yaml
 ```
 
-Nota sul nome della chiave: il chart Bitnami si aspetta `mongodb-passwords`
-(al plurale, anche con un solo utente). Se rinomini, il chart non trova
-le credenziali e fallisce.
+### Passo 3 — Commit e attesa sync
 
-### Passo 3 — Aggiorna il kustomization base
-
-Modifica `platform/mongodb/base/kustomization.yaml` aggiungendo i due
-SealedSecret come resources:
-
-```yaml
-resources:
-  - mongodb-root-credentials-sealed.yaml
-  - mongodb-app-credentials-sealed.yaml
-```
-
-### Passo 4 — Commit e attesa sync
+I file `mongodb-root-credentials-sealed.yaml` e
+`mongodb-app-credentials-sealed.yaml` sono gia' elencati in
+`platform/mongodb/base/kustomization.yaml`. Basta committarli:
 
 ```bash
-git add platform/mongodb/base/
-git commit -m "feat(mongodb): add SealedSecret per credenziali root e applicative"
+git add platform/mongodb/base/mongodb-root-credentials-sealed.yaml \
+        platform/mongodb/base/mongodb-app-credentials-sealed.yaml
+git commit -m "feat(mongodb): add SealedSecret credenziali root e applicative"
 git push
 ```
 
-Argo CD rileva il nuovo commit (entro 3 minuti circa, oppure forzando
-sync manuale via `make argocd-ui` e bottone Sync sulla Application
-`mongodb`). Il controller Sealed Secrets decifra i SealedSecret nei
-Secret reali, e il chart Bitnami procede al deploy.
+Argo CD rileva il nuovo commit (entro ~3 minuti, o forzando sync via
+`make argocd-ui`). Il controller Sealed Secrets crea i Secret reali;
+lo StatefulSet scala a 1 pod; il Job PostSync `mongodb-rs-initiate`
+inizializza il replica set rs0 e crea l'utente `lcnapp` nel db `lcn`.
 
-### Passo 5 — Verifica
+### Passo 4 — Verifica
 
-Tempo atteso: 2-3 minuti dal sync (download immagine + boot replica set).
+Tempo atteso: 3-5 minuti dal sync (download immagine `mongo:8.0` la
+prima volta + boot replica set + esecuzione Job).
 
 ```bash
 # Pod in stato Running
 kubectl -n platform-mongodb get pods
-# atteso: mongodb-0 in stato Running, READY 1/1
+# atteso: mongodb-0 Running READY 1/1, job-pod Completed
 
-# Replica set inizializzato
+# Stato replica set
 kubectl -n platform-mongodb exec mongodb-0 -- \
-  mongosh -u root -p '<ROOT_PASSWORD>' --authenticationDatabase admin \
-  --eval "rs.status()" --quiet | head -20
-# atteso: stato 'PRIMARY' per il membro 0
+  mongosh --quiet \
+  --username root --password '<ROOT_PASSWORD>' \
+  --authenticationDatabase admin \
+  --eval "rs.status().members.forEach(m => print(m.stateStr))"
+# atteso: PRIMARY
 
-# Database e utente applicativo creati
+# Utente applicativo raggiungibile
 kubectl -n platform-mongodb exec mongodb-0 -- \
-  mongosh -u appuser -p '<APP_PASSWORD>' --authenticationDatabase appdb \
-  appdb --eval "db.runCommand({connectionStatus: 1})" --quiet
-# atteso: 'authenticatedUsers: [{ user: appuser, db: appdb }]'
+  mongosh "mongodb://lcnapp:<APP_PASSWORD>@localhost:27017/lcn?replicaSet=rs0" \
+  --quiet --eval "db.runCommand({connectionStatus: 1}).authInfo.authenticatedUsers"
+# atteso: [{ user: 'lcnapp', db: 'lcn' }]
 ```
 
-Se i comandi di verifica passano, MongoDB e' operativo e accessibile
-dal cluster. Connessione applicativa (per workload futuri) usera':
-
+Connessione applicativa per workload futuri:
 ```
-mongodb://appuser:<APP_PASSWORD>@mongodb.platform-mongodb.svc.cluster.local:27017/appdb
+mongodb://lcnapp:<APP_PASSWORD>@mongodb.platform-mongodb.svc.cluster.local:27017/lcn?replicaSet=rs0
 ```
 
 ### Troubleshooting
 
-Se `mongodb-0` resta in `CreateContainerConfigError`: probabile mismatch
-sui nomi dei campi nei Secret. Verifica che `existingSecret` in
-`values-common.yaml` corrisponda a `mongodb-root-credentials` e che il
-Secret contenga i campi `mongodb-root-password` e `mongodb-replica-set-key`.
+**Pod in `CreateContainerConfigError`**: mismatch sui campi del Secret.
+Verifica che i SealedSecret siano stati cifrati con i campi `password`
+e `replica-set-key` (non i vecchi `mongodb-root-password`,
+`mongodb-replica-set-key`). In caso di dubbio, ricifra da zero.
 
-Se il replica set non si inizializza: verifica nei log del pod
-(`kubectl -n platform-mongodb logs mongodb-0`) la presenza di errori
-legati alla `mongodb-replica-set-key`. La chiave deve essere identica
-su tutti i membri (qui ne abbiamo solo uno, quindi non e' un problema).
+**Job `mongodb-rs-initiate` in `Error` / `BackoffLimitExceeded`**: guarda
+i log con `kubectl -n platform-mongodb logs job/mongodb-rs-initiate`.
+Causali tipiche: pod mongodb-0 non ancora Ready al momento del Job
+(il Job ha `backoffLimit: 6`, di solito si recupera da solo), oppure
+password errata nel Secret (verifica con `kubectl get secret
+mongodb-root-credentials -n platform-mongodb -o jsonpath='{.data.password}'
+| base64 -d`).
+
+**Replica set non si inizializza**: verifica che il keyFile sia stato
+copiato correttamente nell'initContainer e che i permessi siano 400:
+```bash
+kubectl -n platform-mongodb exec mongodb-0 -- ls -la /data/keyfile
+# atteso: -r-------- 1 mongodb mongodb ... /data/keyfile
+```

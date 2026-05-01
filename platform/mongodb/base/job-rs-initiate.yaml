@@ -1,0 +1,115 @@
+# platform/mongodb/base/job-rs-initiate.yaml
+#
+# Job idempotente di inizializzazione post-deploy:
+#   1. Attende che mongod sia pronto.
+#   2. Se il replica set rs0 non e' ancora iniziato, lo inizia
+#      (rs.initiate con un singolo membro).
+#   3. Crea l'utente applicativo nel db "lcn" se non esiste gia'.
+#
+# Il Job viene riavviato da Argo CD ad ogni sync solo se il manifest cambia.
+# Per forzare un re-run manuale: kubectl delete job mongodb-rs-initiate
+# e triggera un sync.
+#
+# Riferimenti architetturali:
+# - ADR-001 D7 (segreti via Sealed Secrets)
+# - ADR-003 (manifest puri, eccezione arm64 per MongoDB)
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: mongodb-rs-initiate
+  namespace: platform-mongodb
+  labels:
+    app.kubernetes.io/name: mongodb
+    app.kubernetes.io/component: init-job
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 6
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mongodb
+        app.kubernetes.io/component: init-job
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: rs-initiate
+          image: mongo:8.0
+          env:
+            - name: MONGO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mongodb-root-credentials
+                  key: password
+            - name: MONGO_APP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mongodb-app-credentials
+                  key: password
+          command:
+            - bash
+            - -c
+            - |
+              set -euo pipefail
+
+              HOST="mongodb-0.mongodb-headless.platform-mongodb.svc.cluster.local:27017"
+              MONGOSH="mongosh --quiet --username root --password ${MONGO_ROOT_PASSWORD} --authenticationDatabase admin"
+
+              echo "==> Attendo che mongod sia pronto..."
+              until ${MONGOSH} "mongodb://${HOST}/admin" --eval "db.adminCommand('ping')" > /dev/null 2>&1; do
+                echo "    mongod non ancora pronto, ritento tra 5s..."
+                sleep 5
+              done
+              echo "==> mongod pronto."
+
+              echo "==> Verifico stato replica set..."
+              RS_STATE=$(${MONGOSH} "mongodb://${HOST}/admin" --eval "
+                try {
+                  const s = rs.status();
+                  print(s.ok);
+                } catch(e) {
+                  print('notinitialized');
+                }
+              ")
+
+              if echo "${RS_STATE}" | grep -q "notinitialized"; then
+                echo "==> Replica set non inizializzato — chiamo rs.initiate()..."
+                ${MONGOSH} "mongodb://${HOST}/admin" --eval "
+                  rs.initiate({
+                    _id: 'rs0',
+                    members: [{ _id: 0, host: '${HOST}' }]
+                  })
+                "
+                echo "==> rs.initiate() completato. Attendo che il nodo diventi PRIMARY..."
+                sleep 5
+              else
+                echo "==> Replica set gia' inizializzato (ok=${RS_STATE})."
+              fi
+
+              echo "==> Attendo PRIMARY..."
+              until ${MONGOSH} "mongodb://${HOST}/admin?replicaSet=rs0" --eval "
+                db.isMaster().ismaster === true || quit(1)
+              " > /dev/null 2>&1; do
+                echo "    nodo non ancora PRIMARY, ritento tra 3s..."
+                sleep 3
+              done
+              echo "==> Nodo PRIMARY."
+
+              echo "==> Verifico/creo utente applicativo 'lcnapp'..."
+              ${MONGOSH} "mongodb://${HOST}/admin?replicaSet=rs0" --eval "
+                const lcn = db.getSiblingDB('lcn');
+                const exists = lcn.getUsers().users.some(u => u.user === 'lcnapp');
+                if (!exists) {
+                  lcn.createUser({
+                    user: 'lcnapp',
+                    pwd: '${MONGO_APP_PASSWORD}',
+                    roles: [{ role: 'readWrite', db: 'lcn' }]
+                  });
+                  print('Utente lcnapp creato.');
+                } else {
+                  print('Utente lcnapp gia\\'esistente, skip.');
+                }
+              "
+
+              echo "==> Inizializzazione completata."

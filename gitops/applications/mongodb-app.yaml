@@ -1,15 +1,14 @@
 # gitops/applications/mongodb-app.yaml
 #
-# Application ArgoCD per MongoDB Community (Fase 3, Step 3a).
-# Chart Bitnami mongodb v18.6.31, registry bitnamilegacy (ADR-002).
-# Topology: replicaset a 1 nodo, SCRAM auth, PV local-path 4Gi.
+# Application ArgoCD per MongoDB Community 8.0 — manifest puri Kustomize
+# con immagine mongo:8.0 ufficiale (multi-arch amd64+arm64). ADR-003.
+# Topology: replicaset rs0 a 1 nodo, SCRAM auth, PV local-path 4Gi.
 #
-# Sync automatica attiva, ma il primo deploy e' condizionato dalla
-# presenza dei SealedSecret in platform/mongodb/base/. Fino a quando
-# l'utente non esegue Step 3b (generazione e commit dei SealedSecret),
-# il chart non avra' le credenziali necessarie e il pod non partira'.
-# Questo e' atteso: il fallback si risolve automaticamente al commit
-# dei SealedSecret (selfHeal: true triggera la riconciliazione).
+# Il primo deploy richiede la presenza dei SealedSecret nel repo:
+# - mongodb-root-credentials-sealed.yaml (campi: password, replica-set-key)
+# - mongodb-app-credentials-sealed.yaml  (campo: password)
+# Fino al commit dei SealedSecret il pod non parte (atteso).
+# Appena committati, selfHeal: true triggera la riconciliazione automatica.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -18,7 +17,7 @@ metadata:
   finalizers:
     - resources-finalizer.argocd.argoproj.io
   annotations:
-    argocd.argoproj.io/description: "MongoDB Community 8.0 — replica set 1 nodo, attesa SealedSecret per primo deploy"
+    argocd.argoproj.io/description: "MongoDB 8.0 — replica set 1 nodo, manifest puri arm64-friendly (ADR-003)"
 spec:
   project: default
 

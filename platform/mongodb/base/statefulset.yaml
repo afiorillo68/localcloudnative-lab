@@ -1,0 +1,120 @@
+# platform/mongodb/base/statefulset.yaml
+#
+# StatefulSet per MongoDB Community 8.0 — singolo nodo, replica set rs0.
+# Immagine: mongo:8.0 (Docker Hub ufficiale, multi-arch amd64+arm64).
+# Autenticazione: --auth con --keyFile (per replica set) e root user.
+# Credenziali: montate da SealedSecret via ADR-001 D7.
+#
+# Riferimenti architetturali:
+# - ADR-001 D6 (struttura base + overlays/dev)
+# - ADR-001 D7 (segreti via Sealed Secrets)
+# - ADR-003 (manifest puri, eccezione arm64 per MongoDB)
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongodb
+  namespace: platform-mongodb
+  labels:
+    app.kubernetes.io/name: mongodb
+    app.kubernetes.io/component: database
+spec:
+  serviceName: mongodb-headless
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mongodb
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mongodb
+        app.kubernetes.io/component: database
+    spec:
+      initContainers:
+        - name: init-keyfile
+          image: mongo:8.0
+          command:
+            - bash
+            - -c
+            - |
+              cp /run/secrets/replica-set-key /data/keyfile
+              chmod 400 /data/keyfile
+              chown 999:999 /data/keyfile
+          volumeMounts:
+            - name: datadir
+              mountPath: /data
+            - name: root-credentials
+              mountPath: /run/secrets
+              readOnly: true
+      containers:
+        - name: mongodb
+          image: mongo:8.0
+          command:
+            - mongod
+            - --replSet=rs0
+            - --auth
+            - --keyFile=/data/keyfile
+            - --bind_ip_all
+          env:
+            - name: MONGO_INITDB_ROOT_USERNAME
+              value: root
+            - name: MONGO_INITDB_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mongodb-root-credentials
+                  key: password
+          ports:
+            - name: mongodb
+              containerPort: 27017
+          livenessProbe:
+            exec:
+              command:
+                - mongosh
+                - --eval
+                - "db.adminCommand('ping')"
+                - --username=root
+                - --password=$(MONGO_INITDB_ROOT_PASSWORD)
+                - --authenticationDatabase=admin
+                - --quiet
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+                - mongosh
+                - --eval
+                - "db.adminCommand('ping')"
+                - --username=root
+                - --password=$(MONGO_INITDB_ROOT_PASSWORD)
+                - --authenticationDatabase=admin
+                - --quiet
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          volumeMounts:
+            - name: datadir
+              mountPath: /data/db
+            - name: datadir
+              mountPath: /data/keyfile
+              subPath: keyfile
+      volumes:
+        - name: root-credentials
+          secret:
+            secretName: mongodb-root-credentials
+  volumeClaimTemplates:
+    - metadata:
+        name: datadir
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 4Gi

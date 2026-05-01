@@ -54,7 +54,7 @@ portatile), ma disporre di un ambiente in cui:
 | MetalLB | LoadBalancer integrato di k3d | Funzione equivalente |
 | Apache Apisix | Apache Apisix (chart Helm) | Identico |
 | Keycloak | Keycloak (chart Helm) | Identico |
-| MongoDB Community | MongoDB (chart Bitnami) | Identico |
+| MongoDB Community | MongoDB 8.0 (manifest puri, immagine `mongo:8.0` ufficiale multi-arch — ADR-003) | Identico |
 | OpenSearch | OpenSearch (chart) | Identico, pesante: on-demand |
 | Harbor | Registry integrato di k3d | Sufficiente per dev |
 | Nutanix Objects (S3) | MinIO | API S3-compatibile |

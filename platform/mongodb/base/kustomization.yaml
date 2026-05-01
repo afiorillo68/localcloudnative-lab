@@ -1,32 +1,22 @@
 # platform/mongodb/base/kustomization.yaml
 #
-# Base Kustomize per MongoDB Community.
+# Base Kustomize per MongoDB Community 8.0 — manifest puri.
+# Eccezione rispetto al pattern Helm generator di ADR-001 D8:
+# si usa Kustomize puro perche' l'immagine bitnamilegacy/mongodb e'
+# amd64-only e non funziona su Apple Silicon (cfr. ADR-003).
+#
 # Riferimenti architetturali:
 # - ADR-001 D6 (struttura base + overlays/dev)
 # - ADR-001 D7 (segreti via Sealed Secrets)
-# - ADR-001 D8 (Kustomize con Helm come generator)
-# - ADR-002 (override registry a bitnamilegacy)
+# - ADR-003 (manifest puri, immagine mongo:8.0 ufficiale multi-arch)
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-helmCharts:
-  - name: mongodb
-    # Bitnami ha smesso di servire tarballs classici via HTTP dopo agosto 2025.
-    # helm pull --repo https://charts.bitnami.com/bitnami fallisce in Helm 3.x
-    # (incluso quello bundled in ArgoCD 2.13.x) con "invalid_reference: invalid tag".
-    # La pull OCI funziona correttamente: oci://registry-1.docker.io/bitnamicharts.
-    # Stesso chart, stessa versione, source diversa. Cfr. ADR-002.
-    repo: oci://registry-1.docker.io/bitnamicharts
-    version: 18.6.31
-    releaseName: mongodb
-    namespace: platform-mongodb
-    valuesFile: values-common.yaml
-    includeCRDs: true
-
-# I SealedSecret per le credenziali root e applicative verranno
-# aggiunti in un commit separato dopo essere stati cifrati con
-# kubeseal sul Mac dell'utente. Vedi runbook
-# docs/how-to/sealed-secrets-operations.md sezione 5.
 resources:
+  - namespace.yaml
+  - service-headless.yaml
+  - service.yaml
+  - statefulset.yaml
+  - job-rs-initiate.yaml
   - mongodb-root-credentials-sealed.yaml
   - mongodb-app-credentials-sealed.yaml
