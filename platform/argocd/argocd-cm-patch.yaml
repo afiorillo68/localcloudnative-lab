@@ -1,11 +1,13 @@
 # platform/argocd/argocd-cm-patch.yaml
 #
 # Patch al ConfigMap argocd-cm per il laboratorio locale.
-# ATTENZIONE: queste impostazioni sono pensate per sviluppo locale.
-# Non usare in produzione senza revisione.
+# Applicata in modo atomico da: kubectl apply -k platform/argocd/
 #
-# Applicato da bootstrap/argocd-bootstrap.sh.
-# In seguito gestito da ArgoCD stesso via app-of-apps (platform/argocd/).
+# NON include server.insecure: la chiave non ha effetto in ArgoCD v2.x
+# (quella configurazione va in argocd-cmd-params-cm, non in argocd-cm).
+# Con il port-forward su 443 non e' necessaria: il server usa HTTPS con
+# certificato self-signed, il browser avverte ma la connessione funziona.
+# In Fase 3 Apisix terminera' il TLS e ProxyPass verso argocd-server:443.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -15,15 +17,10 @@ metadata:
     app.kubernetes.io/name: argocd-cm
     app.kubernetes.io/part-of: argocd
 data:
-  # Disabilita TLS sull'argocd-server.
-  # In lab: accesso via port-forward su http:// senza certificato self-signed.
-  # In produzione: rimuovere e configurare TLS via ingress (Apisix).
-  server.insecure: "true"
-
-  # Tracking via annotation invece che label: piu' affidabile con Helm charts
-  # che gestiscono gia' le proprie label.
+  # Tracking via annotation invece che label: piu' affidabile con Helm chart
+  # che gestiscono gia' le proprie label. Evita conflitti di ownership.
   application.resourceTrackingMethod: annotation
 
-  # Timeout di sincronizzazione (default 3 minuti, aumentato per pull lente
-  # da internet in laboratorio).
+  # Timeout sincronizzazione: 5 minuti invece dei 3 di default.
+  # Margine per pull lente in laboratorio (immagini grandi, rete variabile).
   timeout.reconciliation: 300s

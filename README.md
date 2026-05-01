@@ -330,9 +330,17 @@ Tempo atteso: ~2-3 minuti (pull immagini container alla prima esecuzione).
 ### Accesso UI
 
 ```bash
-kubectl port-forward svc/argocd-server -n argocd 8090:80
-# Apri: http://localhost:8090
+make argocd-ui
+# Apri: https://localhost:8090
 ```
+
+Il comando esegue i controlli preliminari (cluster raggiungibile, porta
+8090 libera) e poi lancia `kubectl port-forward -n argocd svc/argocd-server
+8090:443`. Premi `Ctrl-C` per chiudere il tunnel.
+
+Il browser mostrera' un avviso sul certificato self-signed di ArgoCD:
+clicca *Avanzate → Procedi comunque* (o equivalente). L'avviso e' normale e
+non indica un problema di sicurezza nel contesto del laboratorio locale.
 
 ```bash
 # Recupera la password admin iniziale
@@ -340,10 +348,19 @@ kubectl -n argocd get secret argocd-initial-admin-secret \
   -o jsonpath="{.data.password}" | base64 --decode; echo
 ```
 
-> **Nota — modalita' insecure**: l'argocd-server non espone TLS proprio.
-> Il port-forward su porta 80 reindirizza all'interno alla porta 8080.
-> Accedere con `http://localhost:8090` (non https). In Fase 3 Apisix
-> fara' da reverse proxy con TLS termination verso argocd-server.
+> **Nota — port-forward e ciclo di vita del processo**: il tunnel
+> `kubectl port-forward` e' un processo che vive nella shell in cui e' stato
+> lanciato. Se la shell viene chiusa, il Mac va in sleep o il processo viene
+> interrotto, il tunnel cade silenziosamente. Il cluster non e' rotto:
+> basta rilanciare `make argocd-ui`. Vedi anche la sezione
+> [Troubleshooting](#troubleshooting).
+
+> **Nota — evoluzione in Fase 3**: in Fase 3 Apisix sara' configurato come
+> Ingress controller. La UI di Argo CD sara' esposta tramite un ApisixRoute
+> su un hostname dedicato (es. `argocd.lcn-lab.local`), con TLS termination
+> gestita da Apisix e senza necessita' di port-forward. Questo allinea il
+> laboratorio al pattern enterprise target (gateway centralizzato per
+> tutte le console di amministrazione).
 
 ### Verifica
 
@@ -359,9 +376,9 @@ kubectl get applications -n argocd
 # atteso: root, argocd, keycloak, apisix, mongodb — tutte Synced/Healthy
 
 # 4. ArgoCD self-management: modifica argocd-cm-patch.yaml,
-#    fai git push e osserva il sync automatico
-kubectl get configmap argocd-cm -n argocd -o yaml | grep insecure
-# atteso: server.insecure: "true"
+#    fai git push e osserva il sync automatico sul ConfigMap
+kubectl get configmap argocd-cm -n argocd -o yaml | grep resourceTrackingMethod
+# atteso: application.resourceTrackingMethod: annotation
 ```
 
 > **Nota — warning `last-applied-configuration` su installazione esistente**:
@@ -393,7 +410,7 @@ git push
 
 | Componente | Versione | Note |
 |---|---|---|
-| argocd-server | v2.13.3 | Modalita' insecure; TLS termination via Apisix (Fase 3) |
+| argocd-server | v2.13.3 | HTTPS con cert self-signed; accesso via `make argocd-ui`; TLS termination via Apisix in Fase 3 |
 | argocd-application-controller | v2.13.3 | StatefulSet, 1 replica |
 | argocd-repo-server | v2.13.3 | Cache manifest Git |
 | argocd-dex-server | v2.13.3 | OIDC broker; si integra con Keycloak in Fase 3 |
@@ -417,6 +434,29 @@ con auth via Keycloak.*
 ---
 
 ## Troubleshooting
+
+### La UI di Argo CD non risponde piu' dopo essere stata accessibile
+
+**Sintomo**: `make argocd-ui` aveva funzionato, la UI era aperta nel browser,
+poi ha smesso di rispondere (connessione rifiutata o timeout).
+
+**Causa**: il `kubectl port-forward` e' un processo — non un servizio di
+sistema. Vive solo finche' vive la shell in cui e' stato avviato. Se quella
+shell viene chiusa, il Mac va in sleep, la sessione SSH scade, o il processo
+kubectl viene interrotto per qualunque altra ragione, il tunnel cade
+silenziosamente. Il cluster e' integro, i pod di Argo CD continuano a girare:
+manca solo il canale di accesso locale.
+
+**Soluzione**: rilanciare il tunnel.
+
+```bash
+make argocd-ui
+```
+
+Questo e' il comportamento normale del port-forward di Kubernetes e non
+indica alcuna rottura del cluster o di Argo CD.
+
+---
 
 ### `k3d cluster create` fallisce con errori di rete
 
