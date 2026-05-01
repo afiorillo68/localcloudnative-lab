@@ -27,4 +27,6 @@ helmCharts:
 # aggiunti in un commit separato dopo essere stati cifrati con
 # kubeseal sul Mac dell'utente. Vedi runbook
 # docs/how-to/sealed-secrets-operations.md sezione 5.
-resources: []
+resources:
+  - mongodb-root-credentials-sealed.yaml
+  - mongodb-app-credentials-sealed.yaml
