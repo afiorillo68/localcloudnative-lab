@@ -24,3 +24,10 @@ data:
   # Timeout sincronizzazione: 5 minuti invece dei 3 di default.
   # Margine per pull lente in laboratorio (immagini grandi, rete variabile).
   timeout.reconciliation: 300s
+
+  # Abilita il construct helmCharts di Kustomize (Kustomize+Helm generator).
+  # Necessario per i componenti di piattaforma (Sealed Secrets, MongoDB,
+  # Keycloak, Apisix) che usano base/kustomization.yaml con helmCharts,
+  # come da ADR-001 D8. Senza questo flag, Argo CD rifiuta le kustomization
+  # che referenziano chart Helm.
+  kustomize.buildOptions: --enable-helm
