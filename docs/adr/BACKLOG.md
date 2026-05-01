@@ -89,6 +89,10 @@ in un nuovo ADR (ADR-002, ADR-003, ...).
       simuliamo il pattern DCPP a tre cluster?)
 - [ ] Aggiornamento Argo CD a v3.x: pianificato per inizio Fase 3
       (ADR-001 cita Argo CD 3.0.5 come versione DCPP target)
+- [ ] Monitoraggio della sopravvivenza del registry `docker.io/bitnamilegacy`
+      (cfr. ADR-002): verificare ogni 3-6 mesi se Broadcom ha annunciato
+      date di smantellamento. In tal caso, scrivere un ADR successivo
+      che superseda ADR-002 e definisca la nuova rotta.
 
 ## Come usare questo file
 

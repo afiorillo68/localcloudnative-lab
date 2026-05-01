@@ -28,6 +28,7 @@ del formato classico introdotto da Michael Nygard.
 | ID | Titolo | Stato | Data |
 |---|---|---|---|
 | [0001](0001-strategia-gitops.md) | Strategia GitOps per il laboratorio | Accepted | 2026-05-01 |
+| [0002](0002-strategia-registry-chart-helm.md) | Strategia di gestione registry per i chart Helm di piattaforma | Accepted | 2026-05-01 |
 
 ## Quando aggiungere un nuovo ADR
 
