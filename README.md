@@ -364,6 +364,14 @@ kubectl get configmap argocd-cm -n argocd -o yaml | grep insecure
 # atteso: server.insecure: "true"
 ```
 
+> **Nota — warning `last-applied-configuration` su installazione esistente**:
+> se si esegue `kubectl apply -k platform/argocd/` su un cluster in cui ArgoCD
+> era stato installato in precedenza con `kubectl apply -f <url>` (senza
+> kustomize), kubectl emette warning sulle annotation mancanti. Non e' un
+> errore: le annotation vengono aggiunte automaticamente al primo apply e
+> i warning non si ripresentano. Su un'installazione fresh (cluster nuovo)
+> non compaiono.
+
 ### Aggiornare ArgoCD
 
 ```bash
