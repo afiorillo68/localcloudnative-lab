@@ -1,0 +1,38 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.swp
+*.swo
+
+# Kubernetes / Helm
+*.tgz
+charts/
+.helm/
+
+# Local secrets / overrides (mai committare segreti reali)
+*-secrets.yaml
+*.local.yaml
+secrets/
+.env
+.env.local
+
+# Build artifacts
+dist/
+build/
+target/
+node_modules/
+
+# Logs
+*.log
+logs/
+
+# Kubeconfig backups
+kubeconfig-*

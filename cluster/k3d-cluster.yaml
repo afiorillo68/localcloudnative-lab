@@ -1,0 +1,67 @@
+# k3d cluster configuration for localcloudnative-lab
+# Reference: https://k3d.io/v5.7.0/usage/configfile/
+#
+# Crea il cluster con:
+#   k3d cluster create --config cluster/k3d-cluster.yaml
+#
+# Naming:
+#   - Nome progetto/repo: localcloudnative-lab
+#   - Nome cluster k3d:   lcn-lab (forma breve)
+#   - Context kubectl:    k3d-lcn-lab (k3d antepone "k3d-")
+
+apiVersion: k3d.io/v1alpha5
+kind: Simple
+
+metadata:
+  name: lcn-lab
+
+# Single-node in Fase 1.
+# Per multi-nodo simulato impostare agents > 0 in futuro.
+servers: 1
+agents: 0
+
+# Versione di K3s. Pinning esplicito per riproducibilita'.
+# Aggiornare consapevolmente quando serve.
+image: rancher/k3s:v1.30.5-k3s1
+
+# Port-mapping verso il loadbalancer di k3d.
+# 80/443 standard cosi' che le app esposte via Apisix
+# siano raggiungibili da http://localhost senza port-forward.
+ports:
+  - port: 80:80
+    nodeFilters:
+      - loadbalancer
+  - port: 443:443
+    nodeFilters:
+      - loadbalancer
+
+# Registry locale integrato.
+# Sostituisce Harbor in fase di sviluppo.
+# Le immagini buildate localmente vanno taggate come:
+#   k3d-registry.localhost:5000/<nome>:<tag>
+registries:
+  create:
+    name: registry.localhost
+    host: "0.0.0.0"
+    hostPort: "5000"
+
+options:
+  k3d:
+    wait: true
+    timeout: "120s"
+    disableLoadbalancer: false
+    disableImageVolume: false
+  k3s:
+    # Disabilita Traefik (useremo Apache Apisix come ingress gateway,
+    # coerente con lo stack DCPP target).
+    # Disabilita servicelb perche' k3d ha il suo loadbalancer container.
+    extraArgs:
+      - arg: "--disable=traefik"
+        nodeFilters:
+          - server:*
+      - arg: "--disable=servicelb"
+        nodeFilters:
+          - server:*
+  kubeconfig:
+    updateDefaultKubeconfig: true
+    switchCurrentContext: true
