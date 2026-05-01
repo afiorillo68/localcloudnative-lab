@@ -10,16 +10,6 @@ in un nuovo ADR (ADR-002, ADR-003, ...).
 
 ## Fase 3 — Popolamento componenti di piattaforma
 
-### MongoDB
-- [ ] Topologia: replica set (1, 3 nodi) o standalone? (per un lab
-      basta standalone; replica set se vogliamo testare HA in piccolo)
-- [ ] Persistenza: PV su filesystem locale di k3d o ephemeral? (per
-      lab serio, PV; per esperimenti monouso, ephemeral)
-- [ ] Auth: SCRAM con utente root + utente applicativo, o anche
-      x.509? (SCRAM e' sufficiente per il lab)
-- [ ] Versione: 7.x o 8.x? (l'ADR-001 cita 8.0 dal documento DCPP, ma
-      i chart Bitnami potrebbero essere su una minor diversa)
-
 ### Keycloak
 - [ ] Database: PostgreSQL in-cluster o database embedded H2? (per
       pattern enterprise-coerente, PostgreSQL; per setup leggero, H2)

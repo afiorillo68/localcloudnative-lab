@@ -1,8 +1,15 @@
 # gitops/applications/mongodb-app.yaml
 #
-# Application ArgoCD per MongoDB Community (Fase 3).
-# Punta all'overlay dev di Kustomize: platform/mongodb/overlays/dev/.
-# La struttura base + overlays/dev e' predisposta; verra' popolata in Fase 3.
+# Application ArgoCD per MongoDB Community (Fase 3, Step 3a).
+# Chart Bitnami mongodb v18.6.31, registry bitnamilegacy (ADR-002).
+# Topology: replicaset a 1 nodo, SCRAM auth, PV local-path 4Gi.
+#
+# Sync automatica attiva, ma il primo deploy e' condizionato dalla
+# presenza dei SealedSecret in platform/mongodb/base/. Fino a quando
+# l'utente non esegue Step 3b (generazione e commit dei SealedSecret),
+# il chart non avra' le credenziali necessarie e il pod non partira'.
+# Questo e' atteso: il fallback si risolve automaticamente al commit
+# dei SealedSecret (selfHeal: true triggera la riconciliazione).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -11,7 +18,7 @@ metadata:
   finalizers:
     - resources-finalizer.argocd.argoproj.io
   annotations:
-    argocd.argoproj.io/description: "MongoDB Community — Persistent store (Fase 3)"
+    argocd.argoproj.io/description: "MongoDB Community 8.0 — replica set 1 nodo, attesa SealedSecret per primo deploy"
 spec:
   project: default
 
@@ -25,9 +32,9 @@ spec:
     namespace: platform-mongodb
 
   syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
     syncOptions:
       - CreateNamespace=true
-
-  info:
-    - name: "stato"
-      value: "In attesa di Fase 3 — platform/mongodb/ da popolare"
+      - ServerSideApply=true

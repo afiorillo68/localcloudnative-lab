@@ -1,0 +1,68 @@
+# platform/mongodb/base/values-common.yaml
+#
+# Valori Helm comuni per MongoDB. Override dei registry a bitnamilegacy
+# per ADR-002. Topologia replicaset a 1 membro per ADR-001 (decisione 3.1).
+
+# ----- Topologia -----
+architecture: replicaset
+replicaCount: 1
+
+# ----- Auth -----
+# SCRAM con utente root + utente applicativo.
+# Le password reali NON vivono qui: arriveranno via SealedSecret
+# con i nomi di Secret esistenti (existingSecret).
+auth:
+  enabled: true
+  rootUser: root
+  # Il chart legge MONGODB_ROOT_PASSWORD e replica-set keyfile dal
+  # Secret indicato in existingSecret. Lo creiamo via SealedSecret.
+  existingSecret: mongodb-root-credentials
+  usernames:
+    - appuser
+  databases:
+    - appdb
+  # Le password applicative vengono passate via existingSecret nel
+  # Secret 'mongodb-app-credentials' (campo 'mongodb-passwords' come
+  # array, gestito dal chart).
+
+# ----- Persistenza -----
+persistence:
+  enabled: true
+  storageClass: local-path
+  size: 4Gi
+  accessModes:
+    - ReadWriteOnce
+
+# ----- Risorse modeste per il Mac -----
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 1Gi
+
+# ----- Override registry per ADR-002 -----
+image:
+  registry: docker.io
+  repository: bitnamilegacy/mongodb
+  pullPolicy: IfNotPresent
+
+# Immagini collaterali del chart (init, utilities) — stesso registry override.
+volumePermissions:
+  enabled: false  # k3d local-path-provisioner non lo richiede
+  image:
+    registry: docker.io
+    repository: bitnamilegacy/os-shell
+
+# ----- Service -----
+# ClusterIP interno: l'esposizione via ingress arrivera' con Apisix
+# (Step 5). Per ora connessione solo dall'interno del cluster.
+service:
+  type: ClusterIP
+
+# ----- Disabilita feature non necessarie nel lab -----
+metrics:
+  enabled: false  # niente Prometheus per ora
+arbiter:
+  enabled: false  # un solo membro, niente arbiter

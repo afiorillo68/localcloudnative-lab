@@ -1,13 +1,25 @@
 # platform/mongodb/base/kustomization.yaml
 #
-# Base Kustomize per il componente MongoDB Community.
-# Questa cartella conterra' la configurazione comune a tutti gli ambienti
-# (es. helmCharts reference, ConfigMap statiche, RBAC).
-#
-# Stato attuale: PLACEHOLDER. Verra' popolato in Fase 3 con la decisione
-# finale su Helm vs Kustomize (cfr. ADR-001).
+# Base Kustomize per MongoDB Community.
+# Riferimenti architetturali:
+# - ADR-001 D6 (struttura base + overlays/dev)
+# - ADR-001 D7 (segreti via Sealed Secrets)
+# - ADR-001 D8 (Kustomize con Helm come generator)
+# - ADR-002 (override registry a bitnamilegacy)
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# Risorse comuni a tutti gli ambienti (vuoto per ora).
+helmCharts:
+  - name: mongodb
+    repo: https://charts.bitnami.com/bitnami
+    version: 18.6.31
+    releaseName: mongodb
+    namespace: platform-mongodb
+    valuesFile: values-common.yaml
+    includeCRDs: true
+
+# I SealedSecret per le credenziali root e applicative verranno
+# aggiunti in un commit separato dopo essere stati cifrati con
+# kubeseal sul Mac dell'utente. Vedi runbook
+# docs/how-to/sealed-secrets-operations.md sezione 5.
 resources: []

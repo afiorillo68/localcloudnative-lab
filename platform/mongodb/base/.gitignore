@@ -1,0 +1,4 @@
+# Cache Helm chart scaricata da kubectl kustomize --enable-helm.
+# Argo CD scarica il chart direttamente dal repo Helm remoto al momento
+# della sync: non va committata. Stessa logica di platform/sealed-secrets/base/.
+charts/
