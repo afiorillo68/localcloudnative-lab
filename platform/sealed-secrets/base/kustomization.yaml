@@ -15,3 +15,7 @@ helmCharts:
     releaseName: sealed-secrets
     namespace: platform-sealed-secrets
     valuesFile: values-common.yaml
+    # includeCRDs: necessario perche' helm template non include la cartella
+    # crds/ del chart per default. Senza questo flag la CRD SealedSecret
+    # non viene generata da kustomize e il controller non e' utilizzabile.
+    includeCRDs: true
