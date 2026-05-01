@@ -1,0 +1,32 @@
+# apps/apisix-app.yaml
+#
+# Application ArgoCD per Apache Apisix (Fase 3).
+# Sospesa fino a quando platform/apisix/ non e' popolata con chart Helm.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: apisix
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/description: "Apache Apisix — API Gateway / Ingress (Fase 3)"
+spec:
+  project: default
+
+  source:
+    repoURL: ${REPO_URL}
+    targetRevision: HEAD
+    path: platform/apisix
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: apisix
+
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true
+
+  info:
+    - name: "stato"
+      value: "In attesa di Fase 3 — platform/apisix/ da popolare"

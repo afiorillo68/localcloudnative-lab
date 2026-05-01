@@ -1,0 +1,24 @@
+# platform/argocd/kustomization.yaml
+#
+# Overlay Kustomize per ArgoCD in modalita' lab.
+# Base: manifest upstream ArgoCD v2.13.3 (install standard, non HA).
+#
+# Usato da ArgoCD stesso per auto-gestirsi (app-of-apps self-management)
+# una volta che la root Application e' attiva.
+# Al primo bootstrap si usa invece bootstrap/argocd-bootstrap.sh.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: argocd
+
+resources:
+  # Manifest upstream ArgoCD — versione pinned per riproducibilita'.
+  # Per aggiornare: modificare il tag e verificare le release notes.
+  - https://raw.githubusercontent.com/argoproj/argo-cd/v2.13.3/manifests/install.yaml
+
+patches:
+  # Modalita' dev: insecure, annotation tracking, timeout esteso.
+  - path: argocd-cm-patch.yaml
+    target:
+      kind: ConfigMap
+      name: argocd-cm

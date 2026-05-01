@@ -1,0 +1,35 @@
+# apps/keycloak-app.yaml
+#
+# Application ArgoCD per Keycloak (Fase 3).
+# Sospesa fino a quando platform/keycloak/ non e' popolata con chart Helm.
+# Per abilitare: rimuovere spec.info[0] e impostare syncPolicy.automated.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: keycloak
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/description: "Keycloak OIDC — Identity Provider (Fase 3)"
+spec:
+  project: default
+
+  source:
+    repoURL: ${REPO_URL}
+    targetRevision: HEAD
+    path: platform/keycloak
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: keycloak
+
+  # Sospesa: platform/keycloak/ non e' ancora popolata (Fase 3).
+  # Cambiare in `suspended: false` quando la chart Helm e' pronta.
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true
+
+  info:
+    - name: "stato"
+      value: "In attesa di Fase 3 — platform/keycloak/ da popolare"

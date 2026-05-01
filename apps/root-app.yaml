@@ -1,0 +1,51 @@
+# apps/root-app.yaml
+#
+# Root Application — pattern "app-of-apps".
+# Questa e' l'UNICA risorsa applicata manualmente (una tantum) via kubectl.
+# Dopo la prima sincronizzazione, ArgoCD gestisce se stesso e tutti gli altri
+# componenti tramite le Application CR nella directory apps/.
+#
+# Applicazione:
+#   REPO_URL=https://github.com/OWNER/localcloudnative-lab \
+#     envsubst < apps/root-app.yaml | kubectl apply -n argocd -f -
+#
+# oppure tramite bootstrap/argocd-bootstrap.sh se REPO_URL e' impostato.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: root
+  namespace: argocd
+  # Finalizer: fa si' che ArgoCD esegua un cascade delete di tutte le
+  # Application figlie se la root viene eliminata.
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    # Documentazione: questa e' la radice del grafo GitOps.
+    argocd.argoproj.io/description: "Root app-of-apps — gestisce tutte le Application del lab"
+spec:
+  project: default
+
+  source:
+    repoURL: ${REPO_URL}
+    targetRevision: HEAD
+    # Punta alla directory apps/ che contiene le Application CR figlie.
+    path: apps
+    directory:
+      # Includi solo le Application CR, non questo stesso file (root-app.yaml
+      # viene applicato direttamente, non gestito da se stesso per evitare
+      # loop di sincronizzazione).
+      exclude: root-app.yaml
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+
+  syncPolicy:
+    automated:
+      # Rimuove risorse orfane (Application rimosse da apps/ vengono eliminate).
+      prune: true
+      # Ripristina drift: se qualcuno modifica una risorsa direttamente,
+      # ArgoCD la riporta allo stato desiderato.
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

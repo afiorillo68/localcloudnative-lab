@@ -1,0 +1,38 @@
+# apps/argocd-app.yaml
+#
+# ArgoCD si auto-gestisce tramite questa Application.
+# Punta a platform/argocd/ (kustomization overlay) nello stesso repo.
+# In questo modo gli aggiornamenti ad ArgoCD o alla sua config
+# passano dal normale flusso GitOps.
+#
+# Nota: l'auto-sync di ArgoCD su se stesso e' sicuro perche' Kustomize
+# aggiorna solo le risorse cambiate; un aggiornamento del ConfigMap o
+# di un Deployment non causa downtime significativi in un lab.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argocd
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/description: "ArgoCD self-management via platform/argocd/"
+spec:
+  project: default
+
+  source:
+    repoURL: ${REPO_URL}
+    targetRevision: HEAD
+    path: platform/argocd
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+
+  syncPolicy:
+    automated:
+      prune: false      # Prudente: non eliminare risorse ArgoCD automaticamente
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true  # Necessario per CRD grandi

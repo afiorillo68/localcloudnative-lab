@@ -82,13 +82,13 @@ portatile), ma disporre di un ambiente in cui:
 
 ### Software
 
-| Tool | Versione | Note |
-|---|---|---|
-| OrbStack | latest | Container runtime su macOS, alternativa piu' efficiente di Docker Desktop su Apple Silicon |
-| k3d | >= 5.7 | Wrapper per k3s in container Docker |
-| kubectl | >= 1.30 | CLI Kubernetes |
-| Helm | >= 3.15 | Package manager per Kubernetes |
-| Homebrew | latest | Package manager macOS |
+| Tool | Versione minima | Versione testata | Note |
+|---|---|---|---|
+| OrbStack | latest | 2.1.1 (20026) | Container runtime su macOS, alternativa piu' efficiente di Docker Desktop su Apple Silicon |
+| k3d | >= 5.7 | 5.8.3 | Wrapper per k3s in container Docker |
+| kubectl | >= 1.30 | 1.36.0 | CLI Kubernetes |
+| Helm | >= 3.15 | 4.1.4 | Package manager per Kubernetes |
+| Homebrew | latest | 5.1.8 | Package manager macOS |
 
 > **Nota su OrbStack vs Docker Desktop**: OrbStack e' la scelta preferibile
 > su Apple Silicon. Consuma circa la meta' della RAM di Docker Desktop e ha
@@ -117,6 +117,15 @@ helm version
 ```
 
 Avvia OrbStack almeno una volta dall'app per completare il setup.
+
+> **Nota operativa — Docker socket con OrbStack**: OrbStack espone il daemon
+> Docker su `~/.orbstack/run/docker.sock` (non su `/var/run/docker.sock`).
+> Questo e' trasparente per i tool che usano il context Docker corrente, ma
+> se si invoca `k3d` da una shell che non eredita il context OrbStack (es.
+> script CI, sessioni tmux fresche) occorre impostare esplicitamente
+> `DOCKER_HOST=unix://${HOME}/.orbstack/run/docker.sock` oppure assicurarsi
+> che `~/.orbstack/bin` sia nel PATH (OrbStack lo aggiunge al login shell).
+> I binari Docker di OrbStack si trovano in `~/.orbstack/bin/`.
 
 ## Fase 1 — Cluster Kubernetes locale
 
@@ -178,9 +187,18 @@ kubectl get pods -A
 # NON deve apparire traefik (l'abbiamo disabilitato)
 
 # Registry locale
-docker ps | grep k3d-registry
-# atteso: container k3d-registry.localhost in esecuzione su porta 5000
+docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" | grep registry
+# atteso: container registry.localhost in esecuzione su porta 5000
+# Nota: il nome del container e' "registry.localhost" (non "k3d-registry.localhost")
+# come definito in cluster/k3d-cluster.yaml → registries.create.name
 ```
+
+> **Nota operativa — nome container registry**: il container della registry
+> locale si chiama `registry.localhost` (non `k3d-registry.localhost`).
+> Il naming e' determinato dal campo `registries.create.name` nel file
+> `cluster/k3d-cluster.yaml`. L'hostname da usare nei tag delle immagini
+> resta `k3d-registry.localhost:5000` perche' k3d aggiunge automaticamente
+> un alias DNS nel network `k3d-lcn-lab`.
 
 ### Test di sanity
 
@@ -217,10 +235,119 @@ k3d cluster delete lcn-lab
 
 ## Fase 2 — GitOps con ArgoCD
 
-*Da definire al prossimo step. L'idea e' bootstrappare ArgoCD con un
-manifest diretto, poi farlo gestire da se' stesso (app-of-apps pattern), e
-da li' deployare tutti i platform services come Application ArgoCD puntate
-alle cartelle `platform/` di questo repo.*
+### Obiettivo
+
+Bootstrappare ArgoCD con un manifest diretto, poi farlo gestire da se'
+stesso (*app-of-apps pattern*), e da li' deployare tutti i platform services
+come Application ArgoCD puntate alle cartelle `platform/` di questo repo.
+
+### Architettura GitOps
+
+```
+Root Application (apps/root-app.yaml)   ← applicata una sola volta via kubectl
+        │
+        ▼  sincronizza la directory apps/
+   ┌──────────────────────────────────────────────────┐
+   │  apps/                                           │
+   │  ├── argocd-app.yaml    → platform/argocd/      │ ArgoCD self-manages
+   │  ├── keycloak-app.yaml  → platform/keycloak/    │ Fase 3
+   │  ├── apisix-app.yaml    → platform/apisix/      │ Fase 3
+   │  └── mongodb-app.yaml   → platform/mongodb/     │ Fase 3
+   └──────────────────────────────────────────────────┘
+```
+
+Le Application di Fase 3 sono presenti nel repo ma non hanno ancora una
+`syncPolicy.automated`: non provocano nulla finche' le directory
+`platform/<servizio>/` non sono popolate.
+
+### Prerequisiti
+
+Cluster `lcn-lab` attivo (Fase 1). Il bootstrap script lo verifica
+automaticamente.
+
+### Bootstrap (una tantum)
+
+```bash
+# Dalla root del repo
+./bootstrap/argocd-bootstrap.sh
+```
+
+Il script:
+1. Crea il namespace `argocd`
+2. Applica il manifest upstream ArgoCD v2.13.3
+3. Patcha il ConfigMap per la modalita' dev (insecure, annotation tracking)
+4. Attende che tutti i componenti siano `Running`
+5. Stampa password admin e istruzioni di accesso
+
+Tempo atteso: ~2-3 minuti (download immagini alla prima esecuzione).
+
+### Accesso all'UI
+
+```bash
+kubectl port-forward svc/argocd-server -n argocd 8090:80
+# Apri: http://localhost:8090
+# username: admin
+# password: recupera con il comando sotto
+```
+
+```bash
+# Recupera la password iniziale
+kubectl -n argocd get secret argocd-initial-admin-secret \
+  -o jsonpath="{.data.password}" | base64 --decode; echo
+```
+
+> **Nota**: il server ArgoCD gira in modalita' `insecure` (no TLS proprio).
+> Il port-forward su porta 80 reindirizza a 8080 interno. Usare
+> `http://localhost:8090` (non https). Questo e' intenzionale per il lab:
+> in Fase 3 Apisix fara' da reverse proxy con TLS termination.
+
+### Attivazione root Application (richiede repo su GitHub)
+
+Le Application CR in `apps/` usano `${REPO_URL}` come placeholder.
+Per attivarle il repo deve essere pushato su un Git remote raggiungibile
+da ArgoCD (GitHub, GitLab, Gitea, ecc.).
+
+```bash
+# 1. Pusha il repo su GitHub
+git remote add origin https://github.com/OWNER/localcloudnative-lab.git
+git push -u origin main
+
+# 2. Applica la root Application (sostituisce ${REPO_URL})
+REPO_URL=https://github.com/OWNER/localcloudnative-lab \
+  envsubst < apps/root-app.yaml | kubectl apply -n argocd -f -
+
+# 3. Verifica sincronizzazione
+kubectl get applications -n argocd
+```
+
+Dopo questo passaggio ArgoCD gestira' se stesso e le Application figlie
+tramite GitOps: ogni `git push` al branch main si riflettera' nel cluster.
+
+### Verifica post-bootstrap
+
+```bash
+# Tutti i pod argocd in Running
+kubectl get pods -n argocd
+
+# CRD ArgoCD installate
+kubectl get crd | grep argoproj
+
+# Application (solo se root-app e' stata applicata)
+kubectl get applications -n argocd
+```
+
+### Componenti installati
+
+| Componente | Versione | Note |
+|---|---|---|
+| ArgoCD | v2.13.3 | Install manifest standard (non HA) |
+| argocd-application-controller | — | StatefulSet, 1 replica |
+| argocd-server | — | Modalita' insecure per lab |
+| argocd-repo-server | — | — |
+| argocd-dex-server | — | OIDC integration (per Fase 3 con Keycloak) |
+| argocd-redis | — | Cache interna |
+| argocd-applicationset-controller | — | Per ApplicationSet in futuro |
+| argocd-notifications-controller | — | Notifiche (non configurato in lab) |
 
 ## Fase 3 — Platform services
 
@@ -245,9 +372,26 @@ Verificare che OrbStack/Docker sia avviato:
 
 ```bash
 docker ps
+# oppure, se il context non e' configurato:
+~/.orbstack/bin/docker ps
 ```
 
 Se il comando fallisce, avviare OrbStack dall'applicazione.
+
+### `k3d` non trova il daemon Docker (`Cannot connect to Docker daemon`)
+
+OrbStack espone il socket su `~/.orbstack/run/docker.sock`. In alcune
+configurazioni di shell (es. tmux, login remoto) il context Docker potrebbe
+non essere impostato. Soluzione:
+
+```bash
+export DOCKER_HOST=unix://${HOME}/.orbstack/run/docker.sock
+k3d cluster create --config cluster/k3d-cluster.yaml
+```
+
+In alternativa, assicurarsi che la riga di inizializzazione OrbStack sia
+presente nel proprio `.zshrc` / `.bashrc` (OrbStack la aggiunge al primo
+avvio).
 
 ### Le porte 80/443 sono gia' occupate
 
@@ -275,8 +419,8 @@ kubectl config use-context k3d-lcn-lab
 
 ## Roadmap
 
-- [x] **Fase 1** — Cluster k3d con configurazione versionata
-- [ ] **Fase 2** — Bootstrap ArgoCD + app-of-apps
+- [x] **Fase 1** — Cluster k3d con configurazione versionata *(cluster `lcn-lab` attivo, verificato 2026-05-01)*
+- [x] **Fase 2** — Bootstrap ArgoCD + app-of-apps *(ArgoCD v2.13.3 attivo, app-of-apps pronta per GitHub remote, verificato 2026-05-01)*
 - [ ] **Fase 3** — Keycloak con realm preconfigurato
 - [ ] **Fase 3** — Apache Apisix come gateway
 - [ ] **Fase 3** — MongoDB Community

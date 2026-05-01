@@ -1,0 +1,29 @@
+# platform/argocd/argocd-cm-patch.yaml
+#
+# Patch al ConfigMap argocd-cm per il laboratorio locale.
+# ATTENZIONE: queste impostazioni sono pensate per sviluppo locale.
+# Non usare in produzione senza revisione.
+#
+# Applicato da bootstrap/argocd-bootstrap.sh.
+# In seguito gestito da ArgoCD stesso via app-of-apps (platform/argocd/).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-cm
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-cm
+    app.kubernetes.io/part-of: argocd
+data:
+  # Disabilita TLS sull'argocd-server.
+  # In lab: accesso via port-forward su http:// senza certificato self-signed.
+  # In produzione: rimuovere e configurare TLS via ingress (Apisix).
+  server.insecure: "true"
+
+  # Tracking via annotation invece che label: piu' affidabile con Helm charts
+  # che gestiscono gia' le proprie label.
+  application.resourceTrackingMethod: annotation
+
+  # Timeout di sincronizzazione (default 3 minuti, aumentato per pull lente
+  # da internet in laboratorio).
+  timeout.reconciliation: 300s
