@@ -80,6 +80,12 @@ come ADR (Architectural Decision Records) in [`docs/adr/`](docs/adr/).
 L'[ADR-001](docs/adr/0001-strategia-gitops.md) raccoglie le otto decisioni
 interdipendenti sulla strategia GitOps adottata.
 
+Il processo decisionale che ha portato a queste scelte e' descritto
+in [`docs/methodology.md`](docs/methodology.md): un documento
+metodologico che racconta il pattern di lavoro adottato (Architect +
+Engineer + Decisore con strumenti AI) sia in astratto sia con esempi
+concreti tratti dallo sviluppo di questo progetto.
+
 ## Prerequisiti
 
 ### Hardware
