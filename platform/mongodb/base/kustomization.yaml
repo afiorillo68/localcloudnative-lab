@@ -11,7 +11,12 @@ kind: Kustomization
 
 helmCharts:
   - name: mongodb
-    repo: https://charts.bitnami.com/bitnami
+    # Bitnami ha smesso di servire tarballs classici via HTTP dopo agosto 2025.
+    # helm pull --repo https://charts.bitnami.com/bitnami fallisce in Helm 3.x
+    # (incluso quello bundled in ArgoCD 2.13.x) con "invalid_reference: invalid tag".
+    # La pull OCI funziona correttamente: oci://registry-1.docker.io/bitnamicharts.
+    # Stesso chart, stessa versione, source diversa. Cfr. ADR-002.
+    repo: oci://registry-1.docker.io/bitnamicharts
     version: 18.6.31
     releaseName: mongodb
     namespace: platform-mongodb
