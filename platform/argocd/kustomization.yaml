@@ -1,23 +1,44 @@
 # platform/argocd/kustomization.yaml
 #
 # Overlay Kustomize per ArgoCD in modalita' lab.
-# Base: manifest upstream ArgoCD v2.13.3 (install standard, non HA).
 #
-# Usato da ArgoCD stesso per auto-gestirsi (app-of-apps self-management)
-# una volta che la root Application e' attiva.
-# Al primo bootstrap si usa invece bootstrap/argocd-bootstrap.sh.
+# BASE: install.yaml e' il manifest upstream ArgoCD v2.13.3 scaricato e
+# versionato in questo repo. NON si scarica nulla a runtime: chiunque
+# cloni il repo ottiene esattamente la stessa installazione.
+#
+# Per aggiornare ArgoCD:
+#   1. Scarica il nuovo manifest:
+#      curl -fsSL https://raw.githubusercontent.com/argoproj/argo-cd/vX.Y.Z/manifests/install.yaml \
+#        -o platform/argocd/install.yaml
+#   2. Aggiorna la versione nei commenti qui e in bootstrap/argocd-bootstrap.sh
+#   3. git add platform/argocd/install.yaml && git commit && git push
+#   ArgoCD recepisce l'aggiornamento al prossimo ciclo di sync.
+#
+# UTILIZZO (bootstrap una tantum):
+#   kubectl create namespace argocd
+#   kubectl apply -k platform/argocd/
+#
+# UTILIZZO (self-management continuo):
+#   Gestito dalla Application ArgoCD 'argocd' (apps/argocd-app.yaml).
+#   Ogni push su main aggiorna ArgoCD stesso via GitOps.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
+
+# Versione ArgoCD installata — aggiornare insieme a install.yaml
+# Ref: https://github.com/argoproj/argo-cd/releases/tag/v2.13.3
+commonAnnotations:
+  lcn-lab/argocd-version: "v2.13.3"
 
 namespace: argocd
 
 resources:
-  # Manifest upstream ArgoCD — versione pinned per riproducibilita'.
-  # Per aggiornare: modificare il tag e verificare le release notes.
-  - https://raw.githubusercontent.com/argoproj/argo-cd/v2.13.3/manifests/install.yaml
+  # Manifest upstream vendorato — NON modificare a mano.
+  # Per aggiornare seguire le istruzioni in testa a questo file.
+  - install.yaml
 
 patches:
-  # Modalita' dev: insecure, annotation tracking, timeout esteso.
+  # Patch di configurazione per la modalita' laboratorio locale.
+  # Applicata in modo atomico insieme all'installazione base.
   - path: argocd-cm-patch.yaml
     target:
       kind: ConfigMap

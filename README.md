@@ -237,117 +237,161 @@ k3d cluster delete lcn-lab
 
 ### Obiettivo
 
-Bootstrappare ArgoCD con un manifest diretto, poi farlo gestire da se'
-stesso (*app-of-apps pattern*), e da li' deployare tutti i platform services
-come Application ArgoCD puntate alle cartelle `platform/` di questo repo.
+Bootstrappare ArgoCD con il manifest versionato in questo repo, poi
+farlo gestire da se' stesso (*app-of-apps pattern*), e da li' deployare
+tutti i platform services come Application ArgoCD puntate alle cartelle
+`platform/` di questo repo.
 
-### Architettura GitOps
+### File di configurazione
+
+Tutto il necessario per installare e configurare ArgoCD e' in
+`platform/argocd/`. Chiunque cloni il repo ottiene esattamente la stessa
+installazione, senza dipendere da risorse esterne al momento del deploy.
 
 ```
-Root Application (apps/root-app.yaml)   ← applicata una sola volta via kubectl
+platform/argocd/
+├── install.yaml          # Manifest upstream ArgoCD v2.13.3 (vendorato)
+├── kustomization.yaml    # Overlay: base=install.yaml + patch CM dev
+└── argocd-cm-patch.yaml  # Patch ConfigMap: insecure mode, annotation tracking
+```
+
+**`install.yaml`** e' il manifest ufficiale ArgoCD scaricato una volta e
+committato nel repo. Non viene scaricato a runtime: il bootstrap usa
+solo file locali. Per aggiornare ArgoCD scaricare la nuova versione del
+manifest, aggiornare `kustomization.yaml` e fare un push — ArgoCD si
+aggiorna da solo al prossimo ciclo di sync.
+
+**`kustomization.yaml`** combina base e patch in un unico apply atomico:
+install e configurazione vengono applicate insieme, non in passi separati.
+
+**`argocd-cm-patch.yaml`** imposta tre parametri per il laboratorio:
+
+| Parametro | Valore | Motivo |
+|---|---|---|
+| `server.insecure` | `"true"` | Disabilita TLS proprio; TLS termination delegata ad Apisix (Fase 3) |
+| `application.resourceTrackingMethod` | `annotation` | Piu' affidabile con Helm chart che hanno gia' le proprie label |
+| `timeout.reconciliation` | `300s` | Margine per pull lente in lab |
+
+### Pattern app-of-apps
+
+```
+apps/root-app.yaml          ← applicata una sola volta via kubectl (bootstrap)
         │
-        ▼  sincronizza la directory apps/
-   ┌──────────────────────────────────────────────────┐
-   │  apps/                                           │
-   │  ├── argocd-app.yaml    → platform/argocd/      │ ArgoCD self-manages
-   │  ├── keycloak-app.yaml  → platform/keycloak/    │ Fase 3
-   │  ├── apisix-app.yaml    → platform/apisix/      │ Fase 3
-   │  └── mongodb-app.yaml   → platform/mongodb/     │ Fase 3
-   └──────────────────────────────────────────────────┘
+        ▼  ArgoCD sincronizza la directory apps/
+   ┌────────────────────────────────────────────────────────┐
+   │  apps/                                                 │
+   │  ├── argocd-app.yaml    → platform/argocd/            │ ArgoCD self-manages
+   │  ├── keycloak-app.yaml  → platform/keycloak/   [F3]  │
+   │  ├── apisix-app.yaml    → platform/apisix/     [F3]  │
+   │  └── mongodb-app.yaml   → platform/mongodb/    [F3]  │
+   └────────────────────────────────────────────────────────┘
 ```
 
-Le Application di Fase 3 sono presenti nel repo ma non hanno ancora una
-`syncPolicy.automated`: non provocano nulla finche' le directory
-`platform/<servizio>/` non sono popolate.
+La root Application e' l'unica risorsa applicata manualmente (una tantum).
+Tutto il resto — incluso ArgoCD stesso — viene gestito via GitOps: ogni
+`git push` al branch `main` si riflette nel cluster al ciclo successivo.
+
+Le Application `[F3]` sono presenti nel repo ma prive di `syncPolicy.automated`:
+non deployano nulla finche' le rispettive directory `platform/` non sono
+popolate con chart Helm o manifest Kubernetes.
 
 ### Prerequisiti
 
-Cluster `lcn-lab` attivo (Fase 1). Il bootstrap script lo verifica
-automaticamente.
+- Cluster `lcn-lab` attivo (Fase 1 completata)
+- `kubectl` nel PATH e context puntato a `k3d-lcn-lab`
+- Repo pushato su GitHub (necessario per il flusso GitOps)
+- Personal Access Token GitHub con scope `repo` (per repo privati)
 
-### Bootstrap (una tantum)
+### Bootstrap (una tantum, da eseguire dopo aver clonato il repo)
 
 ```bash
 # Dalla root del repo
-./bootstrap/argocd-bootstrap.sh
+GH_TOKEN=<personal-access-token-github> \
+  ./bootstrap/argocd-bootstrap.sh
 ```
 
-Il script:
-1. Crea il namespace `argocd`
-2. Applica il manifest upstream ArgoCD v2.13.3
-3. Patcha il ConfigMap per la modalita' dev (insecure, annotation tracking)
-4. Attende che tutti i componenti siano `Running`
-5. Stampa password admin e istruzioni di accesso
+Il script esegue in sequenza:
 
-Tempo atteso: ~2-3 minuti (download immagini alla prima esecuzione).
+1. **Preflight**: verifica che `kubectl` punti a `k3d-lcn-lab` e che
+   `platform/argocd/install.yaml` esista nel repo clonato.
+2. **Namespace**: `kubectl create namespace argocd` (idempotente).
+3. **Installazione**: `kubectl apply -k platform/argocd/` — unico comando
+   che applica `install.yaml` + `argocd-cm-patch.yaml` in modo atomico.
+4. **Attesa**: rollout status su `argocd-server`, `application-controller`,
+   `repo-server`.
+5. **Credenziali repo**: crea il Secret ArgoCD con il token GitHub per
+   accedere al repo privato.
+6. **Root Application**: applica `apps/root-app.yaml` — da questo momento
+   ArgoCD gestisce se stesso e le Application figlie.
+7. **Riepilogo**: stampa password admin, stato pod, stato Application.
 
-### Accesso all'UI
+Tempo atteso: ~2-3 minuti (pull immagini container alla prima esecuzione).
+
+### Accesso UI
 
 ```bash
 kubectl port-forward svc/argocd-server -n argocd 8090:80
 # Apri: http://localhost:8090
-# username: admin
-# password: recupera con il comando sotto
 ```
 
 ```bash
-# Recupera la password iniziale
+# Recupera la password admin iniziale
 kubectl -n argocd get secret argocd-initial-admin-secret \
   -o jsonpath="{.data.password}" | base64 --decode; echo
 ```
 
-> **Nota**: il server ArgoCD gira in modalita' `insecure` (no TLS proprio).
-> Il port-forward su porta 80 reindirizza a 8080 interno. Usare
-> `http://localhost:8090` (non https). Questo e' intenzionale per il lab:
-> in Fase 3 Apisix fara' da reverse proxy con TLS termination.
+> **Nota — modalita' insecure**: l'argocd-server non espone TLS proprio.
+> Il port-forward su porta 80 reindirizza all'interno alla porta 8080.
+> Accedere con `http://localhost:8090` (non https). In Fase 3 Apisix
+> fara' da reverse proxy con TLS termination verso argocd-server.
 
-### Attivazione root Application (richiede repo su GitHub)
-
-Le Application CR in `apps/` usano `${REPO_URL}` come placeholder.
-Per attivarle il repo deve essere pushato su un Git remote raggiungibile
-da ArgoCD (GitHub, GitLab, Gitea, ecc.).
+### Verifica
 
 ```bash
-# 1. Pusha il repo su GitHub
-git remote add origin https://github.com/OWNER/localcloudnative-lab.git
-git push -u origin main
-
-# 2. Applica la root Application (sostituisce ${REPO_URL})
-REPO_URL=https://github.com/OWNER/localcloudnative-lab \
-  envsubst < apps/root-app.yaml | kubectl apply -n argocd -f -
-
-# 3. Verifica sincronizzazione
-kubectl get applications -n argocd
-```
-
-Dopo questo passaggio ArgoCD gestira' se stesso e le Application figlie
-tramite GitOps: ogni `git push` al branch main si riflettera' nel cluster.
-
-### Verifica post-bootstrap
-
-```bash
-# Tutti i pod argocd in Running
+# 1. Pod tutti Running
 kubectl get pods -n argocd
 
-# CRD ArgoCD installate
+# 2. CRD ArgoCD presenti (3: applications, applicationsets, appprojects)
 kubectl get crd | grep argoproj
 
-# Application (solo se root-app e' stata applicata)
+# 3. Applications sincronizzate
 kubectl get applications -n argocd
+# atteso: root, argocd, keycloak, apisix, mongodb — tutte Synced/Healthy
+
+# 4. ArgoCD self-management: modifica argocd-cm-patch.yaml,
+#    fai git push e osserva il sync automatico
+kubectl get configmap argocd-cm -n argocd -o yaml | grep insecure
+# atteso: server.insecure: "true"
+```
+
+### Aggiornare ArgoCD
+
+```bash
+# 1. Scarica il nuovo manifest
+curl -fsSL https://raw.githubusercontent.com/argoproj/argo-cd/vX.Y.Z/manifests/install.yaml \
+  -o platform/argocd/install.yaml
+
+# 2. Aggiorna la versione in platform/argocd/kustomization.yaml
+#    e in bootstrap/argocd-bootstrap.sh (variabile ARGOCD_VERSION)
+
+# 3. Commit e push — ArgoCD si aggiorna da solo
+git add platform/argocd/install.yaml platform/argocd/kustomization.yaml \
+        bootstrap/argocd-bootstrap.sh
+git commit -m "argocd: aggiorna a vX.Y.Z"
+git push
 ```
 
 ### Componenti installati
 
 | Componente | Versione | Note |
 |---|---|---|
-| ArgoCD | v2.13.3 | Install manifest standard (non HA) |
-| argocd-application-controller | — | StatefulSet, 1 replica |
-| argocd-server | — | Modalita' insecure per lab |
-| argocd-repo-server | — | — |
-| argocd-dex-server | — | OIDC integration (per Fase 3 con Keycloak) |
-| argocd-redis | — | Cache interna |
-| argocd-applicationset-controller | — | Per ApplicationSet in futuro |
-| argocd-notifications-controller | — | Notifiche (non configurato in lab) |
+| argocd-server | v2.13.3 | Modalita' insecure; TLS termination via Apisix (Fase 3) |
+| argocd-application-controller | v2.13.3 | StatefulSet, 1 replica |
+| argocd-repo-server | v2.13.3 | Cache manifest Git |
+| argocd-dex-server | v2.13.3 | OIDC broker; si integra con Keycloak in Fase 3 |
+| argocd-redis | v2.13.3 | Cache interna |
+| argocd-applicationset-controller | v2.13.3 | Per ApplicationSet (uso futuro) |
+| argocd-notifications-controller | v2.13.3 | Non configurato in lab |
 
 ## Fase 3 — Platform services
 
