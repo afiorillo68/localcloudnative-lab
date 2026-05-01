@@ -1,0 +1,4 @@
+# Cache Helm chart scaricata da kubectl kustomize --enable-helm.
+# Argo CD usa il flag --enable-helm configurato in argocd-cm e scarica
+# il chart direttamente dal repo Helm remoto: non va committata.
+charts/
