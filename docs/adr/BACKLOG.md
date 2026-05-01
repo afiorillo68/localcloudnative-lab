@@ -83,6 +83,10 @@ in un nuovo ADR (ADR-002, ADR-003, ...).
       (cfr. ADR-002): verificare ogni 3-6 mesi se Broadcom ha annunciato
       date di smantellamento. In tal caso, scrivere un ADR successivo
       che superseda ADR-002 e definisca la nuova rotta.
+- [ ] Verifica preventiva di compatibilita' arm64 per ogni nuovo
+      componente di piattaforma o workload (cfr. ADR-003 driver
+      arm64). Da applicare a tutte le decisioni di Step 4
+      (Keycloak), Step 5 (Apisix), e Fase 4 (workload applicativi).
 
 ## Come usare questo file
 

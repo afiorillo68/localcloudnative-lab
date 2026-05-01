@@ -29,6 +29,14 @@ del formato classico introdotto da Michael Nygard.
 |---|---|---|---|
 | [0001](0001-strategia-gitops.md) | Strategia GitOps per il laboratorio | Accepted | 2026-05-01 |
 | [0002](0002-strategia-registry-chart-helm.md) | Strategia di gestione registry per i chart Helm di piattaforma | Accepted | 2026-05-01 |
+| [0003](0003-eccezione-mongodb-arm64.md) | Eccezione platform-aware per MongoDB e introduzione del driver di compatibilita' arm64 | Accepted | 2026-05-01 |
+
+> **Nota su decision driver evolutivi**: ADR-003 ha introdotto il
+> decision driver "compatibilita' arm64", che si aggiunge a quelli
+> definiti in ADR-001 e si applica a ogni decisione successiva
+> coinvolgente chart, immagini container, o componenti di piattaforma.
+> Questo e' un esempio di come gli ADR possono evolvere il sistema di
+> decision drivers del progetto, oltre a documentare singole scelte.
 
 ## Quando aggiungere un nuovo ADR
 
