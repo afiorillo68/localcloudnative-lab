@@ -1,15 +1,14 @@
-# apps/root-app.yaml
+# gitops/applications/root-app.yaml
 #
 # Root Application — pattern "app-of-apps".
 # Questa e' l'UNICA risorsa applicata manualmente (una tantum) via kubectl.
 # Dopo la prima sincronizzazione, ArgoCD gestisce se stesso e tutti gli altri
-# componenti tramite le Application CR nella directory apps/.
+# componenti tramite le Application CR nella directory gitops/applications/.
 #
-# Applicazione:
-#   REPO_URL=https://github.com/OWNER/localcloudnative-lab \
-#     envsubst < apps/root-app.yaml | kubectl apply -n argocd -f -
+# Applicazione manuale:
+#   kubectl apply -n argocd -f gitops/applications/root-app.yaml
 #
-# oppure tramite bootstrap/argocd-bootstrap.sh se REPO_URL e' impostato.
+# oppure tramite bootstrap/argocd-bootstrap.sh (gestisce anche credenziali repo).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -28,8 +27,8 @@ spec:
   source:
     repoURL: https://github.com/afiorillo68/localcloudnative-lab
     targetRevision: HEAD
-    # Punta alla directory apps/ che contiene le Application CR figlie.
-    path: apps
+    # Punta alla directory gitops/applications/ che contiene le Application CR figlie.
+    path: gitops/applications
     directory:
       # Includi solo le Application CR, non questo stesso file (root-app.yaml
       # viene applicato direttamente, non gestito da se stesso per evitare
@@ -42,7 +41,7 @@ spec:
 
   syncPolicy:
     automated:
-      # Rimuove risorse orfane (Application rimosse da apps/ vengono eliminate).
+      # Rimuove risorse orfane (Application rimosse da gitops/applications/ vengono eliminate).
       prune: true
       # Ripristina drift: se qualcuno modifica una risorsa direttamente,
       # ArgoCD la riporta allo stato desiderato.

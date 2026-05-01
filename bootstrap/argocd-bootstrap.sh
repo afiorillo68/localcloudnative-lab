@@ -114,7 +114,7 @@ fi
 # ---------------------------------------------------------------------------
 info "Applico root Application (app-of-apps)..."
 kubectl apply -n "${ARGOCD_NAMESPACE}" \
-  -f "${REPO_ROOT}/apps/root-app.yaml"
+  -f "${REPO_ROOT}/gitops/applications/root-app.yaml"
 
 # ---------------------------------------------------------------------------
 # 6. Riepilogo

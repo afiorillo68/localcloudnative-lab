@@ -25,6 +25,8 @@ portatile), ma disporre di un ambiente in cui:
 | Cluster k3d | `lcn-lab` |
 | Context kubectl | `k3d-lcn-lab` (prefisso `k3d-` aggiunto automaticamente) |
 | Registry locale | `k3d-registry.localhost:5000` |
+| `gitops/applications/` | Application CR di Argo CD (definizioni dichiarative GitOps) |
+| `workloads/` | Microservizi e frontend applicativi (Fase 4+, attualmente non popolato) |
 
 ## Indice
 
@@ -275,11 +277,11 @@ install e configurazione vengono applicate insieme, non in passi separati.
 ### Pattern app-of-apps
 
 ```
-apps/root-app.yaml          ← applicata una sola volta via kubectl (bootstrap)
+gitops/applications/root-app.yaml   ← applicata una sola volta via kubectl (bootstrap)
         │
-        ▼  ArgoCD sincronizza la directory apps/
+        ▼  ArgoCD sincronizza la directory gitops/applications/
    ┌────────────────────────────────────────────────────────┐
-   │  apps/                                                 │
+   │  gitops/applications/                                  │
    │  ├── argocd-app.yaml    → platform/argocd/            │ ArgoCD self-manages
    │  ├── keycloak-app.yaml  → platform/keycloak/   [F3]  │
    │  ├── apisix-app.yaml    → platform/apisix/     [F3]  │
@@ -321,7 +323,7 @@ Il script esegue in sequenza:
    `repo-server`.
 5. **Credenziali repo**: crea il Secret ArgoCD con il token GitHub per
    accedere al repo privato.
-6. **Root Application**: applica `apps/root-app.yaml` — da questo momento
+6. **Root Application**: applica `gitops/applications/root-app.yaml` — da questo momento
    ArgoCD gestisce se stesso e le Application figlie.
 7. **Riepilogo**: stampa password admin, stato pod, stato Application.
 
