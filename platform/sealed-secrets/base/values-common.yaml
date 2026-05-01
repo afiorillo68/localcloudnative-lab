@@ -1,0 +1,23 @@
+# platform/sealed-secrets/base/values-common.yaml
+#
+# Valori Helm comuni a tutti gli ambienti per il controller Sealed Secrets.
+# Override specifici per ambiente vanno nell'overlay corrispondente.
+
+# Allineamento con il default atteso dalla CLI kubeseal (ADR-001 D7).
+# Con fullnameOverride il controller si chiama "sealed-secrets-controller"
+# e kubeseal lo trova senza dover passare --controller-name esplicitamente.
+fullnameOverride: sealed-secrets-controller
+
+# Risorse conservative per non saturare il Mac in lab.
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 256Mi
+
+# Non abbiamo Prometheus in lab: disabilita il ServiceMonitor.
+metrics:
+  serviceMonitor:
+    enabled: false

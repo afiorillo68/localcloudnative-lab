@@ -1,0 +1,17 @@
+# platform/sealed-secrets/base/kustomization.yaml
+#
+# Base Kustomize per il controller Sealed Secrets (Bitnami).
+# Usa Kustomize+Helm generator (helmCharts) come da ADR-001 D8.
+# Namespace di installazione: platform-sealed-secrets (ADR-001 D4).
+# Sealed Secrets e' il pattern primario per la gestione segreti
+# committati nel repo (ADR-001 D7).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+helmCharts:
+  - name: sealed-secrets
+    repo: https://bitnami-labs.github.io/sealed-secrets
+    version: 2.18.5
+    releaseName: sealed-secrets
+    namespace: platform-sealed-secrets
+    valuesFile: values-common.yaml

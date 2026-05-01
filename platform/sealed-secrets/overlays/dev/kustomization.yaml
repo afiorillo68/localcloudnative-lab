@@ -1,0 +1,13 @@
+# platform/sealed-secrets/overlays/dev/kustomization.yaml
+#
+# Overlay "dev" per Sealed Secrets.
+# Eredita dalla base senza override: i valori dev coincidono con i common.
+# Un overlay separato (es. "stage") potrebbe sovrascrivere resources o
+# aggiungere patch specifiche per ambiente.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: platform-sealed-secrets
+
+resources:
+  - ../../base

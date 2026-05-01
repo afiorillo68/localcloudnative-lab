@@ -10,16 +10,6 @@ in un nuovo ADR (ADR-002, ADR-003, ...).
 
 ## Fase 3 — Popolamento componenti di piattaforma
 
-### Sealed Secrets
-- [ ] Namespace di installazione: `sealed-secrets`, `kube-system`, o
-      altro? (raccomandazione di default upstream: `kube-system`, ma
-      molti scelgono `sealed-secrets` per coerenza con il pattern
-      "namespace per componente")
-- [ ] Strategia di backup della chiave master: come e dove esportarla?
-      (mia raccomandazione iniziale: export YAML in password manager
-      personale, documentato nel runbook)
-- [ ] Procedura di rotazione della chiave: documentata nel runbook?
-
 ### MongoDB
 - [ ] Topologia: replica set (1, 3 nodi) o standalone? (per un lab
       basta standalone; replica set se vogliamo testare HA in piccolo)

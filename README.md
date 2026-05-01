@@ -40,6 +40,7 @@ portatile), ma disporre di un ambiente in cui:
 6. [Fase 4 — Applicazioni demo (Spring Boot + Angular)](#fase-4--applicazioni-demo) *(da fare)*
 7. [Troubleshooting](#troubleshooting)
 8. [How-to: aggiungere un nuovo ambiente](docs/how-to/add-environment.md)
+9. [How-to: Sealed Secrets — procedure operative](docs/how-to/sealed-secrets-operations.md)
 
 ---
 
@@ -59,6 +60,7 @@ portatile), ma disporre di un ambiente in cui:
 | Nutanix Objects (S3) | MinIO | API S3-compatibile |
 | GitLab + ArgoCD + Kargo | GitHub + ArgoCD locale | GitLab self-hosted troppo pesante |
 | Grafana/Loki/Mimir/Tempo | kube-prometheus-stack + Loki | Versione leggera |
+| Vault / segreti GitOps | Sealed Secrets (Bitnami) | CRD SealedSecret cifrati, sicuri da committare nel repo |
 
 **Cosa NON viene replicato e perche':**
 
@@ -105,6 +107,7 @@ concreti tratti dallo sviluppo di questo progetto.
 | k3d | >= 5.7 | 5.8.3 | Wrapper per k3s in container Docker |
 | kubectl | >= 1.30 | 1.36.0 | CLI Kubernetes |
 | Helm | >= 3.15 | 4.1.4 | Package manager per Kubernetes |
+| kubeseal | >= 0.27 | — | CLI per cifrare segreti con Sealed Secrets; installare con `brew install kubeseal` prima di Fase 3 |
 | Homebrew | latest | 5.1.8 | Package manager macOS |
 
 > **Nota su OrbStack vs Docker Desktop**: OrbStack e' la scelta preferibile
@@ -532,6 +535,7 @@ kubectl config use-context k3d-lcn-lab
 - [x] **Fase 2** — Bootstrap ArgoCD + app-of-apps *(ArgoCD v2.13.3 attivo, app-of-apps pronta per GitHub remote, verificato 2026-05-01)*
 - [x] **Predisposizione struttura base + overlays/dev** *(Fase 3 ready — placeholder Kustomize per keycloak, apisix, mongodb)*
 - [x] **LICENSE, CONTRIBUTING.md, CODE_OF_CONDUCT.md** *(Apache-2.0; Contributor Covenant 2.1 — aggiunti per pubblicazione)*
+- [x] **Fase 3** — Sealed Secrets controller v0.36.6 installato *(namespace `platform-sealed-secrets`, chart Helm 2.18.5)*
 - [ ] **Fase 3** — Keycloak con realm preconfigurato
 - [ ] **Fase 3** — Apache Apisix come gateway
 - [ ] **Fase 3** — MongoDB Community
