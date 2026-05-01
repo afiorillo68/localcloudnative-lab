@@ -22,7 +22,7 @@ spec:
 
   destination:
     server: https://kubernetes.default.svc
-    namespace: keycloak
+    namespace: platform-keycloak
 
   # Sospesa: platform/keycloak/ non e' ancora popolata (Fase 3).
   # Cambiare in `suspended: false` quando la chart Helm e' pronta.

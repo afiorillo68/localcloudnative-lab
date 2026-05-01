@@ -27,6 +27,7 @@ portatile), ma disporre di un ambiente in cui:
 | Registry locale | `k3d-registry.localhost:5000` |
 | `gitops/applications/` | Application CR di Argo CD (definizioni dichiarative GitOps) |
 | `workloads/` | Microservizi e frontend applicativi (Fase 4+, attualmente non popolato) |
+| Namespace componenti di piattaforma | Prefisso `platform-` (es. `platform-keycloak`, `platform-apisix`, `platform-mongodb`) per disambiguare dai namespace applicativi futuri (`workloads/`). Eccezione: `argocd` mantiene il nome convenzionale dell'ecosistema upstream. |
 
 ## Indice
 

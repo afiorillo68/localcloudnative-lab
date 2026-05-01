@@ -21,7 +21,7 @@ spec:
 
   destination:
     server: https://kubernetes.default.svc
-    namespace: apisix
+    namespace: platform-apisix
 
   syncPolicy:
     syncOptions:
