@@ -26,7 +26,7 @@ spec:
   project: default
 
   source:
-    repoURL: ${REPO_URL}
+    repoURL: https://github.com/afiorillo68/localcloudnative-lab
     targetRevision: HEAD
     # Punta alla directory apps/ che contiene le Application CR figlie.
     path: apps
