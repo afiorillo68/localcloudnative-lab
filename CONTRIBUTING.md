@@ -1,74 +1,77 @@
-# Contribuire a localcloudnative-lab
+# Contributing to localcloudnative-lab
 
-Grazie per l'interesse in questo progetto. Le contribuzioni sono benvenute,
-anche se il progetto nasce come laboratorio personale a scopo didattico.
-
----
-
-## Tipi di contribuzione graditi
-
-- **Segnalazioni di errori** nella documentazione o nei manifest.
-- **Fix di bug** nel bootstrap o negli script.
-- **Miglioramenti alla documentazione** (README, ADR, runbook).
-- **Suggerimenti architetturali** tramite issue, con ragionamento esplicito
-  su trade-off e alternative.
-
-Non e' previsto un processo di contribuzione per l'aggiunta di nuovi
-componenti applicativi (workloads): quelli dipendono da scelte di design
-specifiche del progetto DCPP - Tifoserie Web, discusse con l'Architect
-prima di qualsiasi implementazione.
+Thanks for your interest in this project. Contributions are welcome,
+even though the project started as a personal learning lab.
 
 ---
 
-## Come aprire una issue
+## Welcome contributions
 
-Prima di aprire una pull request, apri una issue per discutere la modifica
-proposta. Include:
+- **Bug reports** in the documentation or in the manifests.
+- **Bug fixes** in the bootstrap scripts or in the code.
+- **Documentation improvements** (README, ADRs, runbooks).
+- **Architectural suggestions** via issues, with explicit reasoning
+  about trade-offs and alternatives considered.
 
-- Il problema che vuoi risolvere o il miglioramento che vuoi introdurre.
-- Il contesto (sistema operativo, versione degli strumenti, output di
-  comandi rilevanti).
-- La soluzione che hai in mente, se ce l'hai.
+There is no contribution process for adding new application
+components (workloads): those depend on design choices specific to
+the originating reference project, discussed with the Architect
+before any implementation.
 
 ---
 
-## Come inviare una pull request
+## How to open an issue
 
-1. Fai fork del repo e lavora su un branch dedicato (es. `fix/descrizione-breve`).
-2. Mantieni le modifiche minime e coerenti con lo scope dichiarato.
-3. Se la modifica tocca una decisione architetturale (struttura cartelle,
-   tecnologia, naming convention), aggiorna o crea un ADR in `docs/adr/`.
-4. Assicurati che i manifest YAML siano validi:
+Before opening a pull request, open an issue to discuss the proposed
+change. Include:
+
+- The problem you want to fix or the improvement you want to introduce.
+- Context (operating system, tool versions, output of relevant
+  commands).
+- The solution you have in mind, if any.
+
+---
+
+## How to submit a pull request
+
+1. Fork the repository and work on a dedicated branch (e.g.,
+   `fix/short-description`).
+2. Keep changes minimal and consistent with the declared scope.
+3. If the change touches an architectural decision (folder structure,
+   technology, naming convention), update or create an ADR in
+   `docs/adr/`.
+4. Make sure the YAML manifests are valid:
    ```bash
    kubectl apply --dry-run=client -f <file>
-   # oppure per Kustomize:
+   # or for Kustomize:
    kubectl kustomize <path>
    ```
-5. Aggiorna il README se la modifica impatta procedure operative.
-6. Apri la PR con una descrizione chiara: cosa cambia, perche', come testare.
+5. Update the README if the change impacts operational procedures.
+6. Open the PR with a clear description: what changes, why, how to
+   test.
 
 ---
 
-## Convenzioni
+## Conventions
 
-- **Lingua**: la documentazione e' in italiano; i commit message e i
-  commenti nel codice sono in inglese.
-- **Commit message**: formato convenzionale (`feat:`, `fix:`, `chore:`,
-  `docs:`, `refactor:`), corpo in inglese, descrizione concisa.
-- **YAML**: indentazione a 2 spazi, nessun tab.
-- **ADR**: formato MADR, numerazione progressiva a quattro cifre, stato
-  esplicito (`Proposed` / `Accepted` / `Deprecated` / `Superseded`).
-
----
-
-## Codice di condotta
-
-Questo progetto adotta il [Contributor Covenant 2.1](CODE_OF_CONDUCT.md).
-Partecipare significa accettarne i termini.
+- **Language**: documentation is in English; commit messages and
+  code comments are also in English.
+- **Commit messages**: conventional format (`feat:`, `fix:`,
+  `chore:`, `docs:`, `refactor:`), concise description.
+- **YAML**: 2-space indentation, no tabs.
+- **ADRs**: MADR format, progressive 4-digit numbering, explicit
+  status (`Proposed` / `Accepted` / `Deprecated` / `Superseded`).
 
 ---
 
-## Domande
+## Code of Conduct
 
-Per domande generali sul progetto, apri una issue con il tag `question`.
-Per contatti diretti: `angelo.fiorillo+lcn-lab@gmail.com`.
+This project adopts the [Contributor Covenant 2.1](CODE_OF_CONDUCT.md).
+Participating means accepting its terms.
+
+---
+
+## Questions
+
+For general questions about the project, open an issue with the
+`question` tag. For direct contact: `afiorillo@gmail.com`.
