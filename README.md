@@ -135,8 +135,7 @@ localcloudnative-lab/
 ```
 
 Detailed setup walkthroughs for Phase 1 and Phase 2 live in
-[`docs/setup/`](docs/setup/) (planned reorganization — currently
-inline in earlier README versions).
+[`docs/setup/`](docs/setup/).
 
 ## Naming conventions
 
@@ -227,7 +226,7 @@ In progress / planned:
 - [ ] Phase 4 — End-to-end: Angular → Apisix → Spring Boot → MongoDB with Keycloak auth
 - [ ] Phase 5 — OpenSearch and observability stack (optional, on-demand)
 - [ ] Phase 6 — MinIO as Nutanix Objects equivalent
-- [ ] Reorganization — split inline Phase 1/2 walkthroughs into `docs/setup/`
+- [x] Reorganization — split inline Phase 1/2 walkthroughs into `docs/setup/`
 - [ ] Architecture overview document (`docs/architecture.md`)
 
 ## Contributing
