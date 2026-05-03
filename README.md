@@ -438,6 +438,19 @@ git push
 | argocd-applicationset-controller | v2.13.3 | Per ApplicationSet (uso futuro) |
 | argocd-notifications-controller | v2.13.3 | Non configurato in lab |
 
+## Gestione quotidiana del lab
+
+Il lab e' progettato per essere acceso e spento alla bisogna. I container del cluster k3d consumano risorse solo quando attivi.
+
+| Comando | Descrizione |
+|---|---|
+| `make lab-up` | Avvia il cluster e attende che le componenti critiche siano operative |
+| `make lab-down` | Ferma il cluster k3d (OrbStack resta attivo, va fermato manualmente se desiderato) |
+| `make lab-status` | Mostra lo stato corrente del cluster e dei componenti, senza modificare nulla |
+| `make argocd-ui` | Apre l'interfaccia di Argo CD via port-forward |
+
+Tutti e quattro i comandi sono idempotenti e sicuri da rilanciare.
+
 ## Fase 3 — Platform services
 
 *Keycloak, Apache Apisix, MongoDB. Configurazioni Helm minimali ma
