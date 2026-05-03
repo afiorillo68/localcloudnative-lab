@@ -1,18 +1,20 @@
 # platform/mongodb/base/job-rs-initiate.yaml
 #
-# Job idempotente di inizializzazione post-deploy:
-#   1. Attende che mongod sia pronto.
-#   2. Se il replica set rs0 non e' ancora iniziato, lo inizia
-#      (rs.initiate con un singolo membro).
-#   3. Crea l'utente applicativo nel db "lcn" se non esiste gia'.
+# Job idempotente per l'inizializzazione del replica set MongoDB e
+# la creazione dell'utente applicativo.
 #
-# Il Job viene riavviato da Argo CD ad ogni sync solo se il manifest cambia.
-# Per forzare un re-run manuale: kubectl delete job mongodb-rs-initiate
-# e triggera un sync.
+# Pattern: PostSync hook di Argo CD. Argo CD esegue questo Job
+# dopo che StatefulSet e Service sono stati sincronizzati.
+#
+# Idempotenza:
+# - Se rs.status() restituisce 'ok=1', skip rs.initiate()
+# - Se db.appdb.getUser('appuser') restituisce null, crea l'utente
+# - Altrimenti, skip la creazione
 #
 # Riferimenti architetturali:
 # - ADR-001 D7 (segreti via Sealed Secrets)
-# - ADR-003 (manifest puri, eccezione arm64 per MongoDB)
+# - ADR-003 (manifest puri MongoDB)
+# - Decisione 3.3 di Step 3 (utente applicativo: appuser su appdb)
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -20,96 +22,103 @@ metadata:
   namespace: platform-mongodb
   labels:
     app.kubernetes.io/name: mongodb
-    app.kubernetes.io/component: init-job
+    app.kubernetes.io/component: init
   annotations:
     argocd.argoproj.io/hook: PostSync
     argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
 spec:
   backoffLimit: 10
+  ttlSecondsAfterFinished: 600
   template:
     metadata:
       labels:
         app.kubernetes.io/name: mongodb
-        app.kubernetes.io/component: init-job
+        app.kubernetes.io/component: init
     spec:
       restartPolicy: OnFailure
       containers:
-        - name: rs-initiate
+        - name: init
           image: mongo:7.0
+          imagePullPolicy: IfNotPresent
           env:
-            - name: MONGO_ROOT_PASSWORD
+            - name: ROOT_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: mongodb-root-credentials
                   key: password
-            - name: MONGO_APP_PASSWORD
+            - name: APP_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: mongodb-app-credentials
                   key: password
+            - name: MONGO_HOST
+              value: mongodb-0.mongodb-headless.platform-mongodb.svc.cluster.local
           command:
             - bash
             - -c
             - |
-              set -euo pipefail
-
-              HOST="mongodb-0.mongodb-headless.platform-mongodb.svc.cluster.local:27017"
-              MONGOSH="mongosh --quiet --username root --password ${MONGO_ROOT_PASSWORD} --authenticationDatabase admin"
+              set -e
+              set -o pipefail
 
               echo "==> Attendo che mongod sia pronto..."
-              until ${MONGOSH} "mongodb://${HOST}/admin" --eval "db.adminCommand('ping')" > /dev/null 2>&1; do
-                echo "    mongod non ancora pronto, ritento tra 5s..."
+              until mongosh --host "$MONGO_HOST:27017" \
+                -u root -p "$ROOT_PASSWORD" --authenticationDatabase admin \
+                --quiet --eval "db.adminCommand('ping').ok" 2>/dev/null \
+                | grep -q 1; do
+                echo "    mongod non ancora pronto, retry in 5s..."
                 sleep 5
               done
               echo "==> mongod pronto."
 
               echo "==> Verifico stato replica set..."
-              RS_STATE=$(${MONGOSH} "mongodb://${HOST}/admin" --eval "
-                try {
-                  const s = rs.status();
-                  print(s.ok);
-                } catch(e) {
-                  print('notinitialized');
-                }
-              ")
+              RS_OK=$(mongosh --host "$MONGO_HOST:27017" \
+                -u root -p "$ROOT_PASSWORD" --authenticationDatabase admin \
+                --quiet --eval "try { rs.status().ok } catch(e) { 0 }" 2>/dev/null \
+                | tr -d '[:space:]')
 
-              if echo "${RS_STATE}" | grep -q "notinitialized"; then
-                echo "==> Replica set non inizializzato — chiamo rs.initiate()..."
-                ${MONGOSH} "mongodb://${HOST}/admin" --eval "
-                  rs.initiate({
-                    _id: 'rs0',
-                    members: [{ _id: 0, host: '${HOST}' }]
-                  })
-                "
-                echo "==> rs.initiate() completato. Attendo che il nodo diventi PRIMARY..."
-                sleep 5
+              if [ "$RS_OK" = "1" ]; then
+                echo "==> Replica set gia' inizializzato (ok=1). Skip rs.initiate()."
               else
-                echo "==> Replica set gia' inizializzato (ok=${RS_STATE})."
+                echo "==> Inizializzazione replica set..."
+                mongosh --host "$MONGO_HOST:27017" \
+                  -u root -p "$ROOT_PASSWORD" --authenticationDatabase admin \
+                  --eval "rs.initiate({_id: 'rs0', members: [{_id: 0, host: '$MONGO_HOST:27017'}]})"
+
+                echo "==> Attendo PRIMARY..."
+                until mongosh --host "$MONGO_HOST:27017" \
+                  -u root -p "$ROOT_PASSWORD" --authenticationDatabase admin \
+                  --quiet --eval "rs.status().members[0].stateStr" 2>/dev/null \
+                  | grep -q PRIMARY; do
+                  echo "    nodo non ancora PRIMARY, retry in 3s..."
+                  sleep 3
+                done
+                echo "==> Nodo PRIMARY."
               fi
 
-              echo "==> Attendo PRIMARY..."
-              until ${MONGOSH} "mongodb://${HOST}/admin?replicaSet=rs0" --eval "
-                db.isMaster().ismaster === true || quit(1)
-              " > /dev/null 2>&1; do
-                echo "    nodo non ancora PRIMARY, ritento tra 3s..."
-                sleep 3
-              done
-              echo "==> Nodo PRIMARY."
+              echo "==> Verifico/creo utente applicativo 'appuser' su database 'appdb'..."
+              USER_EXISTS=$(mongosh --host "$MONGO_HOST:27017" \
+                -u root -p "$ROOT_PASSWORD" --authenticationDatabase admin \
+                --quiet --eval "var u = db.getSiblingDB('appdb').getUser('appuser'); if (u === null) { print('NO'); } else { print('YES'); }" 2>/dev/null \
+                | tail -1 \
+                | tr -d '[:space:]')
 
-              echo "==> Verifico/creo utente applicativo 'lcnapp'..."
-              ${MONGOSH} "mongodb://${HOST}/admin?replicaSet=rs0" --eval "
-                const lcn = db.getSiblingDB('lcn');
-                const exists = lcn.getUsers().users.some(u => u.user === 'lcnapp');
-                if (!exists) {
-                  lcn.createUser({
-                    user: 'lcnapp',
-                    pwd: '${MONGO_APP_PASSWORD}',
-                    roles: [{ role: 'readWrite', db: 'lcn' }]
-                  });
-                  print('Utente lcnapp creato.');
-                } else {
-                  print('Utente lcnapp gia\\'esistente, skip.');
-                }
-              "
+              if [ "$USER_EXISTS" = "YES" ]; then
+                echo "==> Utente 'appuser' gia' esistente. Skip createUser."
+              elif [ "$USER_EXISTS" = "NO" ]; then
+                echo "==> Creazione utente 'appuser'..."
+                mongosh --host "$MONGO_HOST:27017" \
+                  -u root -p "$ROOT_PASSWORD" --authenticationDatabase admin \
+                  --eval "db.getSiblingDB('appdb').createUser({user: 'appuser', pwd: '$APP_PASSWORD', roles: [{role: 'readWrite', db: 'appdb'}]})"
+                echo "==> Utente 'appuser' creato."
+              else
+                echo "==> ERRORE: stato utente ambiguo (output: '$USER_EXISTS'). Abort."
+                exit 1
+              fi
 
-              echo "==> Inizializzazione completata."
+              echo "==> Verifica finale: connessione come appuser..."
+              mongosh --host "$MONGO_HOST:27017" \
+                -u appuser -p "$APP_PASSWORD" --authenticationDatabase appdb appdb \
+                --quiet --eval "db.runCommand({connectionStatus: 1}).authInfo.authenticatedUsers"
+              echo "==> Connessione applicativa OK."
+
+              echo "==> Inizializzazione completata con successo."
