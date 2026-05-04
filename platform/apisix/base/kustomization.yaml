@@ -28,6 +28,8 @@ resources:
   - apisixroute-keycloak.yaml
   - apisixtls-argocd.yaml
   - apisixtls-keycloak.yaml
+  - argocd-tls-secret-sealed.yaml
+  - keycloak-tls-secret-sealed.yaml
   # I SealedSecret per i certificati TLS (argocd-tls-secret e
   # keycloak-tls-secret) verranno aggiunti in un commit separato
   # dopo essere stati generati e cifrati con kubeseal in Step 5b.
