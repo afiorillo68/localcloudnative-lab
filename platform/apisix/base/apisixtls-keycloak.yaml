@@ -1,0 +1,16 @@
+# ApisixTls per il certificato self-signed di keycloak.lcn-lab.local
+#
+# NOTA: il Secret keycloak-tls-secret deve esistere nel namespace
+# platform-keycloak prima che l'ApisixTls venga riconciliata.
+# Lo creiamo come SealedSecret in Step 5b (vedi runbook sezione 7).
+apiVersion: apisix.apache.org/v2
+kind: ApisixTls
+metadata:
+  name: keycloak-tls
+  namespace: platform-keycloak
+spec:
+  hosts:
+    - keycloak.lcn-lab.local
+  secret:
+    name: keycloak-tls-secret
+    namespace: platform-keycloak

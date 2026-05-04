@@ -1,13 +1,31 @@
 # platform/apisix/base/kustomization.yaml
 #
-# Base Kustomize per il componente Apache Apisix.
-# Questa cartella conterra' la configurazione comune a tutti gli ambienti
-# (es. helmCharts reference, ConfigMap statiche, RBAC).
-#
-# Stato attuale: PLACEHOLDER. Verra' popolato in Fase 3 con la decisione
-# finale su Helm vs Kustomize (cfr. ADR-001).
+# Base Kustomize per Apache APISIX gateway + Ingress Controller.
+# Riferimenti architetturali:
+# - ADR-001 D6 (struttura base + overlays/dev)
+# - ADR-001 D8 (Kustomize con Helm come generator)
+# NOTA: NON applichiamo ADR-002 (override registry bitnamilegacy)
+# perche' il chart upstream Apache pubblica immagini direttamente
+# in docker.io/apache/* (multi-arch verificate).
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# Risorse comuni a tutti gli ambienti (vuoto per ora).
-resources: []
+helmCharts:
+  - name: apisix
+    repo: https://apache.github.io/apisix-helm-chart
+    version: 2.14.0
+    releaseName: apisix
+    namespace: platform-apisix
+    valuesFile: values-common.yaml
+    includeCRDs: true
+
+resources:
+  - namespace.yaml
+  - apisixroute-argocd.yaml
+  - apisixroute-keycloak.yaml
+  - apisixtls-argocd.yaml
+  - apisixtls-keycloak.yaml
+  # I SealedSecret per i certificati TLS (argocd-tls-secret e
+  # keycloak-tls-secret) verranno aggiunti in un commit separato
+  # dopo essere stati generati e cifrati con kubeseal in Step 5b.
+  # Vedi runbook docs/how-to/sealed-secrets-operations.md sezione 7.

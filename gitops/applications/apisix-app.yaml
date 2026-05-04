@@ -1,8 +1,11 @@
 # gitops/applications/apisix-app.yaml
 #
-# Application ArgoCD per Apache Apisix (Fase 3).
+# Application ArgoCD per Apache APISIX gateway + Ingress Controller (Phase 3 — Step 5a).
 # Punta all'overlay dev di Kustomize: platform/apisix/overlays/dev/.
-# La struttura base + overlays/dev e' predisposta; verra' popolata in Fase 3.
+#
+# Il sync automatico e' abilitato. Il primo deploy sara' parzialmente
+# Degraded per le ApisixTls (argocd-tls-secret e keycloak-tls-secret
+# non esistono ancora): comportamento atteso, si risolve in Step 5b.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -11,7 +14,7 @@ metadata:
   finalizers:
     - resources-finalizer.argocd.argoproj.io
   annotations:
-    argocd.argoproj.io/description: "Apache Apisix — API Gateway / Ingress (Fase 3)"
+    argocd.argoproj.io/description: "Apache APISIX gateway + Ingress Controller, esposizione Argo CD e Keycloak con TLS self-signed"
 spec:
   project: default
 
@@ -25,9 +28,13 @@ spec:
     namespace: platform-apisix
 
   syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
     syncOptions:
       - CreateNamespace=true
+      - ServerSideApply=true
 
   info:
-    - name: "stato"
-      value: "In attesa di Fase 3 — platform/apisix/ da popolare"
+    - name: "step"
+      value: "Step 5a complete — awaiting TLS SealedSecrets from Step 5b"

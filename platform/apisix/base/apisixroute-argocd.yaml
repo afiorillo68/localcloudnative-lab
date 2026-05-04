@@ -1,0 +1,24 @@
+# ApisixRoute per Argo CD UI
+# Esposizione: https://argocd.lcn-lab.local
+#
+# NOTA: la ApisixRoute vive nel namespace del Service target (argocd),
+# non in platform-apisix. L'Ingress Controller di APISIX watcha
+# tutti i namespace per default.
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: argocd-server
+  namespace: argocd
+spec:
+  http:
+    - name: argocd-ui
+      match:
+        hosts:
+          - argocd.lcn-lab.local
+        paths:
+          - /*
+      backends:
+        - serviceName: argocd-server
+          servicePort: 80
+      # Argo CD richiede WebSocket per la UI live
+      websocket: true

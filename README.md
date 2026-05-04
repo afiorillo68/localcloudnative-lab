@@ -59,7 +59,7 @@ your time:
 | Argo CD v2.13.3 | Healthy | Self-managed via app-of-apps, accessible via `make argocd-ui` |
 | Sealed Secrets v0.36.6 | Healthy | Master key backed up in Bitwarden + Keychain |
 | MongoDB 7.0 | Healthy | Replica set rs0, single replica, pure Kustomize manifests (see ADR-003) |
-| Apache Apisix | Planned | Phase 3 — gateway and ingress controller |
+| Apache Apisix | In progress (awaiting TLS certificates) | Phase 3 — Step 5a scaffolded; deploy after Step 5b TLS SealedSecrets |
 | Keycloak | In progress (awaiting credentials) | Phase 3 — Step 4a scaffolded; deploy after Step 4b SealedSecrets |
 | OpenSearch | Planned | Phase 5 — search and observability stack |
 | MinIO | Planned | Phase 6 — S3-compatible object storage |

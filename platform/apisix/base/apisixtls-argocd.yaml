@@ -1,0 +1,17 @@
+# ApisixTls per il certificato self-signed di argocd.lcn-lab.local
+#
+# NOTA: il Secret argocd-tls-secret deve esistere nel namespace argocd
+# prima che l'ApisixTls venga riconciliata dall'Ingress Controller.
+# Lo creiamo come SealedSecret in Step 5b (vedi runbook sezione 7).
+# Fino ad allora questo ApisixTls sara' in stato Pending/Degraded: atteso.
+apiVersion: apisix.apache.org/v2
+kind: ApisixTls
+metadata:
+  name: argocd-tls
+  namespace: argocd
+spec:
+  hosts:
+    - argocd.lcn-lab.local
+  secret:
+    name: argocd-tls-secret
+    namespace: argocd

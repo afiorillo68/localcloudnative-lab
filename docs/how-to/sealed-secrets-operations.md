@@ -451,3 +451,179 @@ yet Ready. Wait or check the postgresql pod status.
 `kubectl -n platform-keycloak logs keycloak-0 | grep -i "import"`.
 Common causes: malformed JSON in the ConfigMap, or the realm
 already exists from a previous attempt.
+
+---
+
+## 7. Generating SealedSecrets and TLS certificates for Apisix (Step 5b)
+
+Procedure to generate the self-signed TLS certificates needed for
+Apisix to terminate HTTPS for Argo CD and Keycloak. Run this once
+after Step 5a (the `platform/apisix/` structure has been scaffolded
+and the Application is waiting for TLS Secrets).
+
+### Prerequisites
+
+- `kubeseal` CLI installed on the Mac (see "Prerequisites" section
+  of this runbook).
+- `openssl` available (preinstalled on macOS).
+- `k3d-lcn-lab` cluster active, Sealed Secrets controller Running
+  in `platform-sealed-secrets`.
+
+### Step 1 — Generate self-signed certificate for argocd.lcn-lab.local
+
+```bash
+# Create a temporary directory for cert generation
+TMPDIR=$(mktemp -d)
+cd "$TMPDIR"
+
+# Generate private key + self-signed cert (10-year validity for the lab)
+openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+  -keyout argocd.key \
+  -out argocd.crt \
+  -subj "/CN=argocd.lcn-lab.local/O=lcn-lab" \
+  -addext "subjectAltName=DNS:argocd.lcn-lab.local"
+
+# Wrap in a TLS Secret manifest
+kubectl create secret tls argocd-tls-secret \
+  --cert=argocd.crt \
+  --key=argocd.key \
+  --namespace=argocd \
+  --dry-run=client -o yaml > argocd-tls-secret.yaml
+
+# Seal it
+kubeseal \
+  --controller-namespace=platform-sealed-secrets \
+  --controller-name=sealed-secrets-controller \
+  --format=yaml \
+  < argocd-tls-secret.yaml \
+  > <REPO_ROOT>/platform/apisix/base/argocd-tls-secret-sealed.yaml
+
+# Cleanup
+cd <REPO_ROOT>
+rm -rf "$TMPDIR"
+```
+
+Replace `<REPO_ROOT>` with the actual path of the cloned repo
+(e.g., `~/Dropbox/Lavoro/lcn-lab`).
+
+### Step 2 — Generate self-signed certificate for keycloak.lcn-lab.local
+
+Same procedure, with `keycloak` in place of `argocd`:
+
+```bash
+TMPDIR=$(mktemp -d)
+cd "$TMPDIR"
+
+openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+  -keyout keycloak.key \
+  -out keycloak.crt \
+  -subj "/CN=keycloak.lcn-lab.local/O=lcn-lab" \
+  -addext "subjectAltName=DNS:keycloak.lcn-lab.local"
+
+kubectl create secret tls keycloak-tls-secret \
+  --cert=keycloak.crt \
+  --key=keycloak.key \
+  --namespace=platform-keycloak \
+  --dry-run=client -o yaml > keycloak-tls-secret.yaml
+
+kubeseal \
+  --controller-namespace=platform-sealed-secrets \
+  --controller-name=sealed-secrets-controller \
+  --format=yaml \
+  < keycloak-tls-secret.yaml \
+  > <REPO_ROOT>/platform/apisix/base/keycloak-tls-secret-sealed.yaml
+
+cd <REPO_ROOT>
+rm -rf "$TMPDIR"
+```
+
+### Step 3 — Update kustomization base
+
+Edit `platform/apisix/base/kustomization.yaml` adding the two
+SealedSecrets to the resources list:
+
+```yaml
+resources:
+  - namespace.yaml
+  - apisixroute-argocd.yaml
+  - apisixroute-keycloak.yaml
+  - apisixtls-argocd.yaml
+  - apisixtls-keycloak.yaml
+  - argocd-tls-secret-sealed.yaml
+  - keycloak-tls-secret-sealed.yaml
+```
+
+### Step 4 — Update local /etc/hosts
+
+Add the two hostnames to the local `/etc/hosts`:
+
+```bash
+sudo sh -c 'cat >> /etc/hosts <<EOF
+
+# lcn-lab Apisix routes
+127.0.0.1 argocd.lcn-lab.local
+127.0.0.1 keycloak.lcn-lab.local
+EOF'
+```
+
+### Step 5 — Commit and verify
+
+```bash
+git add platform/apisix/base/
+git commit -m "feat(apisix): add SealedSecrets for TLS certificates"
+git push
+```
+
+Argo CD detects the commit. Expected sequence:
+
+1. Sealed Secrets controller decrypts the SealedSecrets into TLS Secrets.
+2. Apisix Ingress Controller picks up the `ApisixTls` resources and
+   references the Secrets.
+3. Apisix gateway loads the certificates and starts serving HTTPS.
+
+### Step 6 — End-to-end verification
+
+```bash
+# All Apisix pods Running
+kubectl -n platform-apisix get pods
+# expected: apisix-* Running, apisix-etcd-* Running,
+#           apisix-ingress-controller-* Running
+
+# CRDs registered
+kubectl get crd | grep apisix
+# expected: apisixroutes.apisix.apache.org, apisixtlses.apisix.apache.org, ...
+
+# Open Argo CD via Apisix
+# Browser: https://argocd.lcn-lab.local
+# Accept the self-signed certificate warning.
+# Argo CD UI must load and login work.
+
+# Open Keycloak via Apisix
+# Browser: https://keycloak.lcn-lab.local
+# Accept the self-signed certificate warning.
+# Keycloak admin console must load.
+```
+
+### Troubleshooting
+
+**`https://argocd.lcn-lab.local` returns connection refused**:
+check that `127.0.0.1 argocd.lcn-lab.local` is in `/etc/hosts`
+and that the Apisix gateway pod is Running.
+
+**Browser shows "untrusted certificate"**: expected with
+self-signed certs. Click "Advanced → Proceed".
+
+**HTTP 502 from Apisix**: backend Service unreachable. Check
+`kubectl get svc -A | grep -E '(argocd-server|keycloak)'`.
+
+**ApisixTls in Pending state**: the referenced TLS Secret
+doesn't exist yet, or the SealedSecret hasn't been decrypted.
+Verify with `kubectl -n argocd get secret argocd-tls-secret`
+(and equivalent for keycloak).
+
+### Day-2 — Dismissing port-forwards
+
+Once Apisix is operational and the routes work, the
+`make argocd-ui` and `make keycloak-ui` Makefile targets become
+redundant. They can be removed, or kept as a fallback for
+debugging. Decide based on team preference.

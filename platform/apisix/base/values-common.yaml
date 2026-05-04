@@ -1,0 +1,79 @@
+# platform/apisix/base/values-common.yaml
+#
+# Valori Helm per Apache APISIX gateway + Ingress Controller.
+# Versione chart: 2.14.0 (APISIX 3.16.0)
+# Pattern: deploy combinato gateway + ingress controller in un'unica release Helm.
+#
+# NOTA SCHEMA: nel chart apisix/apisix, replicaCount e resources sono
+# top-level (non sotto apisix:). Il blocco apisix: contiene configurazione
+# specifica del processo APISIX (ssl, router, plugins, ecc.).
+
+# ----- Architettura -----
+# Single-replica per lab (no HA)
+replicaCount: 1
+
+# ----- Risorse modeste per il Mac -----
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+# ----- APISIX process config -----
+apisix:
+  # SSL termination al gateway
+  ssl:
+    enabled: true
+
+# ----- Service esposizione -----
+# type LoadBalancer con loadbalancer integrato di k3d.
+# Le porte 80/443 sono gia' mappate dal cluster k3d (vedi cluster/k3d-cluster.yaml).
+service:
+  type: LoadBalancer
+  http:
+    enabled: true
+    servicePort: 80
+    containerPort: 9080
+  tls:
+    servicePort: 443
+    # containerPort e' 9443 per default (apisix.ssl.containerPort)
+
+# ----- etcd embedded (subchart bitnamilegacy/etcd) -----
+# Single-node sufficient per il lab.
+etcd:
+  enabled: true
+  replicaCount: 1
+  persistence:
+    enabled: true
+    size: 2Gi
+    storageClass: local-path
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
+# ----- Ingress Controller -----
+# Abilitato come subchart della stessa release Helm (decisione 5.2).
+ingress-controller:
+  enabled: true
+  config:
+    apisix:
+      serviceNamespace: platform-apisix
+      serviceName: apisix-admin
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
+# ----- Metrics/monitoring disabilitati -----
+metrics:
+  serviceMonitor:
+    enabled: false

@@ -1,0 +1,20 @@
+# ApisixRoute per Keycloak
+# Esposizione: https://keycloak.lcn-lab.local
+#
+# NOTA: la ApisixRoute vive nel namespace del Service target (platform-keycloak).
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: keycloak
+  namespace: platform-keycloak
+spec:
+  http:
+    - name: keycloak-ui
+      match:
+        hosts:
+          - keycloak.lcn-lab.local
+        paths:
+          - /*
+      backends:
+        - serviceName: keycloak
+          servicePort: 80
