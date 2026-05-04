@@ -21,7 +21,5 @@ helmCharts:
 resources:
   - namespace.yaml
   - configmap-realm.yaml
-  # I SealedSecret per le credenziali admin e PostgreSQL verranno
-  # aggiunti in un commit separato dopo essere stati cifrati con
-  # kubeseal sul Mac dell'utente. Vedi runbook
-  # docs/how-to/sealed-secrets-operations.md sezione 6.
+  - keycloak-admin-credentials-sealed.yaml
+  - keycloak-postgres-credentials-sealed.yaml
