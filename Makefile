@@ -2,7 +2,7 @@
 # Shortcut operativi per il laboratorio Kubernetes locale.
 # Uso: make <target>
 
-.PHONY: help argocd-ui lab-up lab-down lab-status
+.PHONY: help argocd-ui keycloak-ui lab-up lab-down lab-status
 
 # Target di default: mostra i target disponibili
 help:
@@ -10,6 +10,7 @@ help:
 	@echo "  localcloudnative-lab — comandi disponibili"
 	@echo ""
 	@echo "  make argocd-ui     Apre il tunnel kubectl port-forward verso l'UI di Argo CD"
+	@echo "  make keycloak-ui   Apre il tunnel kubectl port-forward verso l'UI di Keycloak"
 	@echo "  make lab-up        Avvia il cluster e attende readiness dei componenti"
 	@echo "  make lab-down      Ferma il cluster k3d"
 	@echo "  make lab-status    Mostra lo stato corrente del cluster e dei componenti"
@@ -78,6 +79,66 @@ argocd-ui:
 	@echo "└─────────────────────────────────────────────────────────┘"
 	@echo ""
 	kubectl port-forward -n argocd svc/argocd-server 8090:443
+
+# ------------------------------------------------------------------------------
+# keycloak-ui
+#
+# Apre un tunnel kubectl port-forward verso il Service Keycloak (HTTP, porta 80).
+# L'accesso avviene su http://localhost:8091.
+#
+# Prerequisiti verificati prima di avviare il tunnel:
+#   1. Il cluster Kubernetes e' raggiungibile (kubectl cluster-info).
+#   2. La porta 8091 non e' gia' in uso (lsof -i :8091).
+# ------------------------------------------------------------------------------
+keycloak-ui:
+	@# --- Controllo 1: cluster raggiungibile ---
+	@echo "→ Verifico che il cluster sia raggiungibile..."
+	@kubectl cluster-info > /dev/null 2>&1 || { \
+	  echo ""; \
+	  echo "  ERRORE: cluster Kubernetes non raggiungibile."; \
+	  echo ""; \
+	  echo "  Possibili cause:"; \
+	  echo "    • OrbStack non e' avviato  →  apri l'app OrbStack"; \
+	  echo "    • Il cluster lcn-lab non esiste  →  k3d cluster list"; \
+	  echo "    • Il cluster e' fermo  →  k3d cluster start lcn-lab"; \
+	  echo "    • kubectl punta al cluster sbagliato  →  kubectl config use-context k3d-lcn-lab"; \
+	  echo ""; \
+	  exit 1; \
+	}
+	@echo "  OK: cluster raggiungibile."
+	@# --- Controllo 2: porta 8091 libera ---
+	@echo "→ Verifico che la porta 8091 sia libera..."
+	@lsof -i :8091 -sTCP:LISTEN > /dev/null 2>&1 && { \
+	  echo ""; \
+	  echo "  ERRORE: la porta 8091 e' gia' occupata."; \
+	  echo ""; \
+	  echo "  Processo in ascolto:"; \
+	  lsof -i :8091 -sTCP:LISTEN | awk 'NR>1 {printf "    PID %-6s %s\n", $$2, $$1}'; \
+	  echo ""; \
+	  echo "  Soluzioni:"; \
+	  echo "    • Chiudi il processo che occupa la porta"; \
+	  echo "    • Oppure termina un eventuale port-forward precedente:"; \
+	  echo "      kill \$$(lsof -ti :8091)"; \
+	  echo ""; \
+	  exit 1; \
+	} || true
+	@echo "  OK: porta 8091 libera."
+	@# --- Avvio tunnel ---
+	@echo ""
+	@echo "┌─────────────────────────────────────────────────────────┐"
+	@echo "│  Keycloak UI                                            │"
+	@echo "│                                                         │"
+	@echo "│  URL:  http://localhost:8091                            │"
+	@echo "│  user: admin                                            │"
+	@echo "│  pass: kubectl -n platform-keycloak get secret         │"
+	@echo "│          keycloak-admin-credentials                    │"
+	@echo "│          -o jsonpath='{.data.admin-password}'          │"
+	@echo "│          | base64 --decode; echo                       │"
+	@echo "│                                                         │"
+	@echo "│  Ctrl-C per chiudere il tunnel.                        │"
+	@echo "└─────────────────────────────────────────────────────────┘"
+	@echo ""
+	kubectl port-forward -n platform-keycloak svc/keycloak 8091:80
 
 # ------------------------------------------------------------------------------
 # lab-down

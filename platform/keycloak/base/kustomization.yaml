@@ -1,13 +1,27 @@
 # platform/keycloak/base/kustomization.yaml
 #
-# Base Kustomize per il componente Keycloak.
-# Questa cartella conterra' la configurazione comune a tutti gli ambienti
-# (es. helmCharts reference, ConfigMap statiche, RBAC).
-#
-# Stato attuale: PLACEHOLDER. Verra' popolato in Fase 3 con la decisione
-# finale su Helm vs Kustomize (cfr. ADR-001).
+# Base Kustomize per Keycloak con PostgreSQL come subchart.
+# Riferimenti architetturali:
+# - ADR-001 D6 (struttura base + overlays/dev)
+# - ADR-001 D7 (segreti via Sealed Secrets)
+# - ADR-001 D8 (Kustomize con Helm come generator)
+# - ADR-002 (override registry a bitnamilegacy)
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# Risorse comuni a tutti gli ambienti (vuoto per ora).
-resources: []
+helmCharts:
+  - name: keycloak
+    repo: oci://registry-1.docker.io/bitnamicharts
+    version: 25.2.0
+    releaseName: keycloak
+    namespace: platform-keycloak
+    valuesFile: values-common.yaml
+    includeCRDs: false
+
+resources:
+  - namespace.yaml
+  - configmap-realm.yaml
+  # I SealedSecret per le credenziali admin e PostgreSQL verranno
+  # aggiunti in un commit separato dopo essere stati cifrati con
+  # kubeseal sul Mac dell'utente. Vedi runbook
+  # docs/how-to/sealed-secrets-operations.md sezione 6.

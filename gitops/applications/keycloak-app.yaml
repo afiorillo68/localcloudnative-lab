@@ -1,9 +1,12 @@
 # gitops/applications/keycloak-app.yaml
 #
-# Application ArgoCD per Keycloak (Fase 3).
+# Application ArgoCD per Keycloak (Phase 3 — Step 4a).
 # Punta all'overlay dev di Kustomize: platform/keycloak/overlays/dev/.
-# La struttura base + overlays/dev e' predisposta; verra' popolata in Fase 3.
-# Per abilitare: popolare platform/keycloak/base/ e impostare syncPolicy.automated.
+#
+# Il sync automatico e' abilitato. Il primo deploy completo attendera'
+# la presenza dei SealedSecret in platform/keycloak/base/ (Step 4b).
+# Fino a quel momento la Helm release sara' in errore per Secret mancanti:
+# comportamento atteso, si risolve automaticamente dopo Step 4b.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -12,7 +15,7 @@ metadata:
   finalizers:
     - resources-finalizer.argocd.argoproj.io
   annotations:
-    argocd.argoproj.io/description: "Keycloak OIDC — Identity Provider (Fase 3)"
+    argocd.argoproj.io/description: "Keycloak 26.x con PostgreSQL subchart, realm 'lcn' minimale, attesa SealedSecret"
 spec:
   project: default
 
@@ -25,12 +28,14 @@ spec:
     server: https://kubernetes.default.svc
     namespace: platform-keycloak
 
-  # Sospesa: platform/keycloak/base/ non e' ancora popolata (Fase 3).
-  # Cambiare in syncPolicy.automated quando base/ conterra' risorse reali.
   syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
     syncOptions:
       - CreateNamespace=true
+      - ServerSideApply=true
 
   info:
-    - name: "stato"
-      value: "In attesa di Fase 3 — platform/keycloak/ da popolare"
+    - name: "step"
+      value: "Step 4a complete — awaiting SealedSecrets from Step 4b"

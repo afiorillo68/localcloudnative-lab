@@ -316,3 +316,138 @@ copiato correttamente nell'initContainer e che i permessi siano 400:
 kubectl -n platform-mongodb exec mongodb-0 -- ls -la /data/keyfile
 # atteso: -r-------- 1 mongodb mongodb ... /data/keyfile
 ```
+
+---
+
+## 6. Generating SealedSecrets for Keycloak (Step 4b)
+
+Procedure to generate and commit the SealedSecrets needed for the
+first Keycloak deploy in Step 4b. Run this once after Step 4a
+(the `platform/keycloak/` structure has been scaffolded but the
+Application is still waiting for credentials).
+
+### Prerequisites
+
+- `kubeseal` CLI installed on the Mac (see "Prerequisites" section
+  of this runbook).
+- `k3d-lcn-lab` cluster active, Sealed Secrets controller in
+  Running state in `platform-sealed-secrets`.
+- Two robust passwords chosen for:
+  - The Keycloak admin user (suggested: 24+ characters, generated
+    by Bitwarden, stored as `lcn-lab — Keycloak admin password`)
+  - The PostgreSQL user/admin (suggested: same approach, stored as
+    `lcn-lab — Keycloak Postgres password`)
+
+### Step 1 — Generate the Secret for Keycloak admin
+
+```bash
+# Replace <ADMIN_PASSWORD> with the password chosen for admin.
+kubectl create secret generic keycloak-admin-credentials \
+  --from-literal=admin-password='<ADMIN_PASSWORD>' \
+  --namespace=platform-keycloak \
+  --dry-run=client -o yaml > /tmp/keycloak-admin-credentials.yaml
+
+kubeseal \
+  --controller-namespace=platform-sealed-secrets \
+  --controller-name=sealed-secrets-controller \
+  --format=yaml \
+  < /tmp/keycloak-admin-credentials.yaml \
+  > platform/keycloak/base/keycloak-admin-credentials-sealed.yaml
+
+rm /tmp/keycloak-admin-credentials.yaml
+```
+
+### Step 2 — Generate the Secret for PostgreSQL credentials
+
+The PostgreSQL Secret must contain TWO fields:
+
+- `postgres-admin-password`: the postgres superuser password
+- `postgres-user-password`: the application user password (for the
+  `keycloak` user that connects to the `keycloak` database)
+
+```bash
+# Replace <PG_ADMIN_PASSWORD> and <PG_USER_PASSWORD> with the
+# respective passwords. They MUST be different.
+kubectl create secret generic keycloak-postgres-credentials \
+  --from-literal=postgres-admin-password='<PG_ADMIN_PASSWORD>' \
+  --from-literal=postgres-user-password='<PG_USER_PASSWORD>' \
+  --namespace=platform-keycloak \
+  --dry-run=client -o yaml > /tmp/keycloak-postgres-credentials.yaml
+
+kubeseal \
+  --controller-namespace=platform-sealed-secrets \
+  --controller-name=sealed-secrets-controller \
+  --format=yaml \
+  < /tmp/keycloak-postgres-credentials.yaml \
+  > platform/keycloak/base/keycloak-postgres-credentials-sealed.yaml
+
+rm /tmp/keycloak-postgres-credentials.yaml
+```
+
+### Step 3 — Update kustomization base
+
+Edit `platform/keycloak/base/kustomization.yaml` adding the two
+SealedSecrets to the resources list:
+
+```yaml
+resources:
+  - namespace.yaml
+  - configmap-realm.yaml
+  - keycloak-admin-credentials-sealed.yaml
+  - keycloak-postgres-credentials-sealed.yaml
+```
+
+### Step 4 — Commit and wait for sync
+
+```bash
+git add platform/keycloak/base/
+git commit -m "feat(keycloak): add SealedSecrets for admin and Postgres credentials"
+git push
+```
+
+Argo CD detects the new commit. Expected sequence in the cluster:
+
+1. Sealed Secrets controller decrypts the SealedSecrets into real
+   Secrets.
+2. The Helm release deploys: PostgreSQL StatefulSet starts first,
+   then Keycloak Deployment once Postgres is Ready.
+3. Keycloak boots in start-dev mode, imports the `lcn` realm
+   from the ConfigMap.
+4. The Keycloak pod becomes Ready.
+
+Total expected time: 2-4 minutes (image pulls + Postgres init +
+Keycloak boot + realm import).
+
+### Step 5 — Verification
+
+```bash
+# All pods Running
+kubectl -n platform-keycloak get pods
+# expected: keycloak-0 Running 1/1
+#           keycloak-postgresql-0 Running 1/1
+
+# Realm imported
+kubectl -n platform-keycloak logs deployment/keycloak | grep -i "imported"
+# expected: a line confirming the 'lcn' realm was imported
+
+# UI accessible
+make keycloak-ui
+# Open https://localhost:8091
+# Login: admin / <ADMIN_PASSWORD>
+# In the realm dropdown, switch to 'lcn' and verify the 'developer' user exists.
+```
+
+Application connection (for future workloads using the `lcn` realm):
+`https://keycloak.platform-keycloak.svc.cluster.local/realms/lcn`
+
+### Troubleshooting
+
+**Pod `keycloak-0` in `CrashLoopBackOff`**: check
+`kubectl -n platform-keycloak logs keycloak-0`. If you see
+"Could not connect to PostgreSQL", the PostgreSQL pod is not
+yet Ready. Wait or check the postgresql pod status.
+
+**Realm import failed**: check
+`kubectl -n platform-keycloak logs keycloak-0 | grep -i "import"`.
+Common causes: malformed JSON in the ConfigMap, or the realm
+already exists from a previous attempt.

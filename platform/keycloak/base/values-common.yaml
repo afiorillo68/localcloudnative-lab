@@ -1,0 +1,85 @@
+# platform/keycloak/base/values-common.yaml
+#
+# Valori Helm comuni per Keycloak con PostgreSQL subchart.
+# Override dei registry a bitnamilegacy per ADR-002.
+
+# ----- Architettura -----
+# Single-replica per lab (no HA)
+replicaCount: 1
+
+# ----- Image override per ADR-002 -----
+image:
+  registry: docker.io
+  repository: bitnamilegacy/keycloak
+  pullPolicy: IfNotPresent
+
+# ----- Auth -----
+auth:
+  adminUser: admin
+  existingSecret: keycloak-admin-credentials
+  passwordSecretKey: admin-password
+
+# ----- Production mode -----
+# Disabilitato: in lab usiamo lo start-dev mode di Keycloak
+# per facilitare debug e operazioni rapide.
+production: false
+proxy: edge  # rilevante quando Apisix sara' davanti, in Phase 3
+
+# ----- Realm import -----
+# Importa il realm 'lcn' definito nel ConfigMap.
+extraStartupArgs: "--import-realm"
+extraVolumes:
+  - name: realm-import
+    configMap:
+      name: keycloak-realm-import
+extraVolumeMounts:
+  - name: realm-import
+    mountPath: /opt/bitnami/keycloak/data/import
+    readOnly: true
+
+# ----- Service -----
+service:
+  type: ClusterIP
+  ports:
+    http: 80
+
+# ----- Risorse modeste per il Mac -----
+resources:
+  requests:
+    cpu: 100m
+    memory: 512Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+
+# ----- PostgreSQL come subchart -----
+postgresql:
+  enabled: true
+  auth:
+    username: keycloak
+    database: keycloak
+    existingSecret: keycloak-postgres-credentials
+    # Il chart Bitnami leggera' password e postgres-password dal Secret
+    secretKeys:
+      adminPasswordKey: postgres-admin-password
+      userPasswordKey: postgres-user-password
+  image:
+    registry: docker.io
+    repository: bitnamilegacy/postgresql
+    pullPolicy: IfNotPresent
+  primary:
+    persistence:
+      enabled: true
+      size: 4Gi
+      storageClass: local-path
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+# ----- Disabilitiamo metrics e altro -----
+metrics:
+  enabled: false

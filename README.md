@@ -60,7 +60,7 @@ your time:
 | Sealed Secrets v0.36.6 | Healthy | Master key backed up in Bitwarden + Keychain |
 | MongoDB 7.0 | Healthy | Replica set rs0, single replica, pure Kustomize manifests (see ADR-003) |
 | Apache Apisix | Planned | Phase 3 — gateway and ingress controller |
-| Keycloak | Planned | Phase 3 — IAM with preconfigured realm |
+| Keycloak | In progress (awaiting credentials) | Phase 3 — Step 4a scaffolded; deploy after Step 4b SealedSecrets |
 | OpenSearch | Planned | Phase 5 — search and observability stack |
 | MinIO | Planned | Phase 6 — S3-compatible object storage |
 
@@ -113,8 +113,9 @@ RAM at rest (rising to ~1 GB under active use).
 | `make lab-down` | Stop the cluster (OrbStack stays running, stop manually if desired) |
 | `make lab-status` | Show current state without modifying anything |
 | `make argocd-ui` | Port-forward and instructions for the Argo CD UI |
+| `make keycloak-ui` | Port-forward and instructions for the Keycloak UI |
 
-All four commands are idempotent and safe to re-run.
+All commands are idempotent and safe to re-run.
 
 ## Repository structure
 
