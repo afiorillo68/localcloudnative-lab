@@ -10,6 +10,31 @@ in un nuovo ADR (ADR-002, ADR-003, ...).
 
 ## Fase 3 — Popolamento componenti di piattaforma
 
+### ADR proposed — Etcd standalone for Apisix (Step 5)
+
+**Status**: Proposed (to be ratified)
+
+**Context**: The upstream Apache APISIX Helm chart includes
+`bitnami/etcd` as a subchart. This subchart registers Helm hooks
+(`pre-upgrade,pre-install`) that ArgoCD interprets as PreSync hooks.
+The hook Job fails on first install due to a chicken-and-egg
+dependency on a Secret that the same hook is supposed to create.
+
+**Decision**: Disable the etcd subchart (`etcd.enabled: false`) and
+deploy etcd standalone in the same namespace, using the upstream
+CoreOS image `quay.io/coreos/etcd:v3.5.21` (multi-arch verified).
+Configure Apisix to point at the standalone etcd via
+`externalEtcd.host`.
+
+**Consequences**:
+- Removes Bitnami legacy from the Apisix subsystem
+- Eliminates the Helm hook compatibility issue with ArgoCD
+- Adds explicit ownership of the etcd component (small overhead)
+- Single-node etcd is acceptable for the lab; for production-grade
+  deployments a multi-node etcd cluster would be required
+
+**To be promoted to formal ADR** when the lab Phase 3 is closed.
+
 ### Keycloak
 - [ ] Database: PostgreSQL in-cluster o database embedded H2? (per
       pattern enterprise-coerente, PostgreSQL; per setup leggero, H2)

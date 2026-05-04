@@ -456,6 +456,14 @@ already exists from a previous attempt.
 
 ## 7. Generating SealedSecrets and TLS certificates for Apisix (Step 5b)
 
+> **Note**: Step 5a was originally scaffolded with the Bitnami etcd
+> subchart, which caused a PreSync hook deadlock on ArgoCD. The fix
+> (see commit history for `fix(apisix): replace bitnami etcd subchart
+> with standalone etcd`) replaced the subchart with a standalone etcd
+> deployment (`quay.io/coreos/etcd:v3.5.21`). The procedure below is
+> unchanged: it generates TLS certificates, not etcd-related secrets.
+> The standalone etcd uses no auth (lab-internal traffic only).
+
 Procedure to generate the self-signed TLS certificates needed for
 Apisix to terminate HTTPS for Argo CD and Keycloak. Run this once
 after Step 5a (the `platform/apisix/` structure has been scaffolded

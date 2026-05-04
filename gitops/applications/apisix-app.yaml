@@ -1,11 +1,16 @@
 # gitops/applications/apisix-app.yaml
 #
-# Application ArgoCD per Apache APISIX gateway + Ingress Controller (Phase 3 — Step 5a).
+# Application ArgoCD per Apache APISIX gateway + Ingress Controller (Phase 3 — Step 5a-fix).
 # Punta all'overlay dev di Kustomize: platform/apisix/overlays/dev/.
 #
-# Il sync automatico e' abilitato. Il primo deploy sara' parzialmente
-# Degraded per le ApisixTls (argocd-tls-secret e keycloak-tls-secret
-# non esistono ancora): comportamento atteso, si risolve in Step 5b.
+# NOTE: il subchart bitnami/etcd e' disabilitato (etcd.enabled: false
+# in values-common.yaml). Etcd e' deployato standalone come componente
+# separato in platform/apisix/base/etcd-standalone.yaml.
+# Vedi backlog ADR per la motivazione architetturale.
+#
+# Il primo deploy sara' parzialmente Degraded per le ApisixTls
+# (argocd-tls-secret e keycloak-tls-secret non esistono ancora):
+# comportamento atteso, si risolve in Step 5b.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -14,7 +19,7 @@ metadata:
   finalizers:
     - resources-finalizer.argocd.argoproj.io
   annotations:
-    argocd.argoproj.io/description: "Apache APISIX gateway + Ingress Controller, esposizione Argo CD e Keycloak con TLS self-signed"
+    argocd.argoproj.io/description: "Apache APISIX gateway + Ingress Controller, etcd standalone (no Bitnami subchart), esposizione Argo CD e Keycloak con TLS self-signed"
 spec:
   project: default
 
@@ -37,4 +42,4 @@ spec:
 
   info:
     - name: "step"
-      value: "Step 5a complete — awaiting TLS SealedSecrets from Step 5b"
+      value: "Step 5a-fix complete — awaiting TLS SealedSecrets from Step 5b"

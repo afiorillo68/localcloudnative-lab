@@ -1,0 +1,121 @@
+# platform/apisix/base/etcd-standalone.yaml
+#
+# Etcd standalone come backend di Apisix (in sostituzione del
+# subchart bitnami/etcd disabilitato per problemi di hook PreSync
+# su ArgoCD). Single-node, persistenza locale, niente auth (lab).
+#
+# Componenti:
+#   - StatefulSet etcd-standalone (1 replica)
+#   - Service etcd-standalone (ClusterIP, porta 2379)
+#   - PVC implicito via volumeClaimTemplates
+apiVersion: v1
+kind: Service
+metadata:
+  name: etcd-standalone
+  namespace: platform-apisix
+  labels:
+    app.kubernetes.io/name: etcd-standalone
+    app.kubernetes.io/part-of: platform-apisix
+    app.kubernetes.io/component: etcd
+spec:
+  type: ClusterIP
+  ports:
+    - name: client
+      port: 2379
+      targetPort: 2379
+      protocol: TCP
+    - name: peer
+      port: 2380
+      targetPort: 2380
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: etcd-standalone
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: etcd-standalone
+  namespace: platform-apisix
+  labels:
+    app.kubernetes.io/name: etcd-standalone
+    app.kubernetes.io/part-of: platform-apisix
+    app.kubernetes.io/component: etcd
+spec:
+  serviceName: etcd-standalone
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: etcd-standalone
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: etcd-standalone
+        app.kubernetes.io/part-of: platform-apisix
+        app.kubernetes.io/component: etcd
+    spec:
+      containers:
+        - name: etcd
+          image: quay.io/coreos/etcd:v3.5.21
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: client
+              containerPort: 2379
+            - name: peer
+              containerPort: 2380
+          env:
+            - name: ETCD_NAME
+              value: etcd-standalone
+            - name: ETCD_DATA_DIR
+              value: /var/lib/etcd
+            - name: ETCD_LISTEN_CLIENT_URLS
+              value: http://0.0.0.0:2379
+            - name: ETCD_ADVERTISE_CLIENT_URLS
+              value: http://etcd-standalone.platform-apisix.svc.cluster.local:2379
+            - name: ETCD_LISTEN_PEER_URLS
+              value: http://0.0.0.0:2380
+            - name: ETCD_INITIAL_ADVERTISE_PEER_URLS
+              value: http://etcd-standalone.platform-apisix.svc.cluster.local:2380
+            - name: ETCD_INITIAL_CLUSTER
+              value: etcd-standalone=http://etcd-standalone.platform-apisix.svc.cluster.local:2380
+            - name: ETCD_INITIAL_CLUSTER_STATE
+              value: new
+            - name: ETCD_INITIAL_CLUSTER_TOKEN
+              value: lcn-lab-etcd
+            # Disabilita auth — lab single-node, no esposizione esterna
+            - name: ALLOW_NONE_AUTHENTICATION
+              value: "yes"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/etcd
+          livenessProbe:
+            exec:
+              command:
+                - /usr/local/bin/etcdctl
+                - endpoint
+                - health
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command:
+                - /usr/local/bin/etcdctl
+                - endpoint
+                - health
+            initialDelaySeconds: 10
+            periodSeconds: 5
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: local-path
+        resources:
+          requests:
+            storage: 2Gi

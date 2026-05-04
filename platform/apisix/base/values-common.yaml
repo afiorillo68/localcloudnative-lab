@@ -7,6 +7,12 @@
 # NOTA SCHEMA: nel chart apisix/apisix, replicaCount e resources sono
 # top-level (non sotto apisix:). Il blocco apisix: contiene configurazione
 # specifica del processo APISIX (ssl, router, plugins, ecc.).
+#
+# NOTA ETCD: il subchart bitnami/etcd e' disabilitato (etcd.enabled: false).
+# Etcd e' deployato standalone in platform/apisix/base/etcd-standalone.yaml.
+# Apisix e' configurato per usarlo tramite externalEtcd.host.
+# Motivazione: il subchart bitnami/etcd registra hook Helm pre-upgrade/pre-install
+# che ArgoCD interpreta come PreSync, causando un deadlock su installazione fresh.
 
 # ----- Architettura -----
 # Single-replica per lab (no HA)
@@ -27,6 +33,21 @@ apisix:
   ssl:
     enabled: true
 
+# ----- etcd: subchart disabilitato, etcd standalone esterno -----
+# Il subchart bitnami/etcd causa un deadlock PreSync su ArgoCD.
+# Usiamo etcd standalone deployato come StatefulSet separato.
+etcd:
+  enabled: false
+
+# Punta all'etcd standalone nel namespace platform-apisix.
+# externalEtcd viene usato quando etcd.enabled: false.
+# user/password vuoti = no authentication (lab-internal, non esposto).
+externalEtcd:
+  host:
+    - "http://etcd-standalone.platform-apisix.svc.cluster.local:2379"
+  user: ""
+  password: ""
+
 # ----- Service esposizione -----
 # type LoadBalancer con loadbalancer integrato di k3d.
 # Le porte 80/443 sono gia' mappate dal cluster k3d (vedi cluster/k3d-cluster.yaml).
@@ -39,23 +60,6 @@ service:
   tls:
     servicePort: 443
     # containerPort e' 9443 per default (apisix.ssl.containerPort)
-
-# ----- etcd embedded (subchart bitnamilegacy/etcd) -----
-# Single-node sufficient per il lab.
-etcd:
-  enabled: true
-  replicaCount: 1
-  persistence:
-    enabled: true
-    size: 2Gi
-    storageClass: local-path
-  resources:
-    requests:
-      cpu: 50m
-      memory: 128Mi
-    limits:
-      cpu: 250m
-      memory: 256Mi
 
 # ----- Ingress Controller -----
 # Abilitato come subchart della stessa release Helm (decisione 5.2).
