@@ -52,14 +52,16 @@ options:
     disableLoadbalancer: false
     disableImageVolume: false
   k3s:
-    # Disabilita Traefik (useremo Apache Apisix come ingress gateway,
+    # NOTE: servicelb (klipper-lb) is enabled by default by k3s and we
+    # keep it enabled. It provides LoadBalancer Services for the lab,
+    # using the k3d port mapping (80/443). In the enterprise target,
+    # this role is fulfilled by MetalLB; for the local lab klipper-lb
+    # is sufficient and idiomatic to k3d.
+    #
+    # Disabilita solo Traefik (useremo Apache Apisix come ingress gateway,
     # coerente con lo stack DCPP target).
-    # Disabilita servicelb perche' k3d ha il suo loadbalancer container.
     extraArgs:
       - arg: "--disable=traefik"
-        nodeFilters:
-          - server:*
-      - arg: "--disable=servicelb"
         nodeFilters:
           - server:*
   kubeconfig:

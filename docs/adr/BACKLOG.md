@@ -10,6 +10,20 @@ in un nuovo ADR (ADR-002, ADR-003, ...).
 
 ## Fase 3 — Popolamento componenti di piattaforma
 
+### Lab vs enterprise — LoadBalancer implementation
+
+**Status**: Documented design choice, not blocking.
+
+**Context**: The lab uses `servicelb` (klipper-lb, k3s default) for
+`LoadBalancer` Services. The enterprise target uses MetalLB (cf.
+ADR-001). For a single-host lab, klipper-lb is sufficient and
+idiomatic to k3d; MetalLB would add operational complexity without
+proportional value.
+
+**Future evolution**: replace klipper-lb with MetalLB if the lab
+is extended to multi-host scenarios or if validating MetalLB-
+specific behavior becomes necessary.
+
 ### ADR proposed — Etcd standalone for Apisix (Step 5)
 
 **Status**: Proposed (to be ratified)
