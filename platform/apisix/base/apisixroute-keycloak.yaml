@@ -8,6 +8,7 @@ metadata:
   name: keycloak
   namespace: platform-keycloak
 spec:
+  ingressClassName: apisix
   http:
     - name: keycloak-ui
       match:

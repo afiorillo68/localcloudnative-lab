@@ -461,7 +461,11 @@ already exists from a previous attempt.
 > deployment, then patched again to fix the LoadBalancer
 > and Kustomize namespace overrides. Following these patches,
 > a cluster reset was performed (master key restored from
-> Bitwarden backup). The procedure below is unchanged.
+> Bitwarden backup). A further fix (Step 5a-fix3) added
+> `ingress-controller.gatewayProxy.createDefault: true` to the chart
+> values, plus `ingressClassName: apisix` to all ApisixRoute and
+> ApisixTls resources. The procedure below for generating TLS
+> SealedSecrets is unchanged.
 
 Procedure to generate the self-signed TLS certificates needed for
 Apisix to terminate HTTPS for Argo CD and Keycloak. Run this once

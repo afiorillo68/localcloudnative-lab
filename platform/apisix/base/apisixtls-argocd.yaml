@@ -10,6 +10,7 @@ metadata:
   name: argocd-tls
   namespace: argocd
 spec:
+  ingressClassName: apisix
   hosts:
     - argocd.lcn-lab.local
   secret:

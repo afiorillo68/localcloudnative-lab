@@ -10,6 +10,7 @@ metadata:
   name: argocd-server
   namespace: argocd
 spec:
+  ingressClassName: apisix
   http:
     - name: argocd-ui
       match:

@@ -9,6 +9,7 @@ metadata:
   name: keycloak-tls
   namespace: platform-keycloak
 spec:
+  ingressClassName: apisix
   hosts:
     - keycloak.lcn-lab.local
   secret:

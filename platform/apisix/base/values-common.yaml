@@ -65,10 +65,17 @@ service:
 # Abilitato come subchart della stessa release Helm (decisione 5.2).
 ingress-controller:
   enabled: true
-  config:
-    apisix:
-      serviceNamespace: platform-apisix
-      serviceName: apisix-admin
+  gatewayProxy:
+    createDefault: true   # genera GatewayProxy + IngressClass 'apisix'
+  # Configurazione admin API per il subchart ingress-controller.
+  # 'apisix.adminService' e' la via legacy; 'gatewayProxy.provider'
+  # e' quella corrente (IC v2.0+). Entrambe sono fornite per
+  # compatibilita'.
+  apisix:
+    adminService:
+      namespace: platform-apisix
+      name: apisix-admin
+      port: 9180
   resources:
     requests:
       cpu: 50m
