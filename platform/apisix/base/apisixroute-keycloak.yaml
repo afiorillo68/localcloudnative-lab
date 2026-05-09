@@ -2,6 +2,12 @@
 # Esposizione: https://keycloak.lcn-lab.local
 #
 # NOTA: la ApisixRoute vive nel namespace del Service target (platform-keycloak).
+#
+# proxy-rewrite inietta X-Forwarded-Proto: https perche' APISIX termina TLS
+# e fa ProxyPass su HTTP. Senza questo header, Keycloak genera URL di redirect
+# con schema http:// (es. /auth, /realms, callback OIDC).
+# Complementare a KC_PROXY_HEADERS=xforwarded in values-common.yaml.
+# Ref: https://www.keycloak.org/server/reverseproxy
 apiVersion: apisix.apache.org/v2
 kind: ApisixRoute
 metadata:
@@ -19,3 +25,10 @@ spec:
       backends:
         - serviceName: keycloak
           servicePort: 80
+      plugins:
+        - name: proxy-rewrite
+          enable: true
+          config:
+            headers:
+              set:
+                X-Forwarded-Proto: "https"

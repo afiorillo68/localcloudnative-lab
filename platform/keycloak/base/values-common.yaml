@@ -23,7 +23,16 @@ auth:
 # Disabilitato: in lab usiamo lo start-dev mode di Keycloak
 # per facilitare debug e operazioni rapide.
 production: false
-proxy: edge  # rilevante quando Apisix sara' davanti, in Phase 3
+
+# proxy: edge e' deprecato in Keycloak >= 24 (chart Bitnami 24.x).
+# Il chart non traduce piu' 'proxy' in KC_PROXY; usiamo extraEnvVars
+# per impostare direttamente KC_PROXY_HEADERS=xforwarded.
+# Complementare al plugin proxy-rewrite X-Forwarded-Proto: https in
+# platform/apisix/base/apisixroute-keycloak.yaml.
+# Ref: https://www.keycloak.org/server/reverseproxy
+extraEnvVars:
+  - name: KC_PROXY_HEADERS
+    value: xforwarded
 
 # ----- Realm import -----
 # Importa il realm 'lcn' definito nel ConfigMap.
