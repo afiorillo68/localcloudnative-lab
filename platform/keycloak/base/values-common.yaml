@@ -33,12 +33,13 @@ production: false
 extraEnvVars:
   - name: KC_PROXY_HEADERS
     value: xforwarded
-  # KC_HOSTNAME forza il base URL esterno usato da Keycloak per generare
-  # redirect, OIDC discovery, token issuer. Senza questo, Keycloak usa la
-  # porta interna (9443) anche quando KC_PROXY_HEADERS e' impostato.
-  # In start-dev mode KC_HOSTNAME_STRICT=false e' default (non imposto qui).
+  # KC_HOSTNAME in Keycloak 25+ accetta una URL completa (schema+host+porta).
+  # Impostare solo il hostname lascia Keycloak libero di appendere la porta
+  # interna (9443). Con la URL completa https://<host> Keycloak usa porta 443
+  # (default HTTPS) per tutti i redirect, OIDC discovery e token issuer.
+  # Ref: https://www.keycloak.org/server/hostname (Keycloak 25+ full URL)
   - name: KC_HOSTNAME
-    value: keycloak.lcn-lab.local
+    value: https://keycloak.lcn-lab.local
 
 # ----- Realm import -----
 # Importa il realm 'lcn' definito nel ConfigMap.
