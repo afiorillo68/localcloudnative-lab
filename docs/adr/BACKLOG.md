@@ -42,65 +42,6 @@ proportional value.
 is extended to multi-host scenarios or if validating MetalLB-
 specific behavior becomes necessary.
 
-### ADR proposed — Etcd standalone for Apisix (Step 5)
-
-**Status**: Proposed (to be ratified)
-
-**Context**: The upstream Apache APISIX Helm chart includes
-`bitnami/etcd` as a subchart. This subchart registers Helm hooks
-(`pre-upgrade,pre-install`) that ArgoCD interprets as PreSync hooks.
-The hook Job fails on first install due to a chicken-and-egg
-dependency on a Secret that the same hook is supposed to create.
-
-**Decision**: Disable the etcd subchart (`etcd.enabled: false`) and
-deploy etcd standalone in the same namespace, using the upstream
-CoreOS image `quay.io/coreos/etcd:v3.5.21` (multi-arch verified).
-Configure Apisix to point at the standalone etcd via
-`externalEtcd.host`.
-
-**Consequences**:
-
-- Removes Bitnami legacy from the Apisix subsystem
-- Eliminates the Helm hook compatibility issue with ArgoCD
-- Adds explicit ownership of the etcd component (small overhead)
-- Single-node etcd is acceptable for the lab; for production-grade
-  deployments a multi-node etcd cluster would be required
-
-**To be promoted to formal ADR** when the lab Phase 3 is closed.
-
-### Keycloak
-
-- [ ] Database: PostgreSQL in-cluster o database embedded H2? (per
-      pattern enterprise-coerente, PostgreSQL; per setup leggero, H2)
-- [ ] Hostname: come esponiamo Keycloak prima dell'installazione di
-      Apisix? (port-forward iniziale, poi rotta Apisix in seconda
-      battuta)
-- [ ] Realm di default: quanti realm creiamo? un singolo realm "lcn"
-      per gli esperimenti, o un realm per ambiente?
-- [ ] Utenti seed: creiamo via Keycloak Operator, via Helm postsync
-      hook, via Job custom? (probabilmente Job che gira `kcadm.sh`)
-- [ ] Theme custom: lasciamo quello di default o ne aggiungiamo uno?
-      (skip per Fase 3, eventualmente in futuro)
-
-### Apache Apisix
-
-- [ ] Configurazione storage: ETCD (default) o PostgreSQL?
-      (raccomandazione storica: ETCD; il documento DCPP cita anche
-      PostgreSQL come alternativa ma e' sotto verifica)
-- [ ] Strategia rotte: definite via CRD `ApisixRoute` (Apisix Ingress
-      Controller) o via API admin? (CRD e' GitOps-compatibile, API
-      admin no)
-- [ ] Esposizione: Apisix prende le porte 80/443 dal LoadBalancer di
-      k3d, e i Service interni vengono raggiunti via Apisix. Conferma?
-- [ ] Plugin abilitati: minimo essenziale (auth via OIDC con Keycloak,
-      rate limiting) o set piu' ampio?
-
-### Patch ad Argo CD
-
-- [ ] Aggiungere `kustomize.buildOptions: --enable-helm` al
-      ConfigMap `argocd-cm` prima di Fase 3 (gotcha annotato in
-      ADR-001 D8)
-
 ## Fase 4 — Workloads applicativi
 
 ### Naming dei namespace dei workloads
@@ -134,23 +75,150 @@ Configure Apisix to point at the standalone etcd via
 - [ ] On-demand (start/stop con make) o sempre attivo?
 - [ ] Visualizzazione: dashboard custom o solo "out of the box"?
 
+### Argo CD: federation OIDC con Keycloak
+
+**Status**: Proposed for Phase 5+.
+
+**Context**: Argo CD currently uses the auto-generated initial admin
+password (stored in Bitwarden as
+`lcn-lab — Argo CD admin password (initial, lab-grade)`). This
+password is regenerated on every cluster reset, requiring manual
+Bitwarden update each time.
+
+**Decision**: Configure Argo CD OIDC integration with Keycloak.
+Users log in to Argo CD via Keycloak's `lcn` realm. The local admin
+password is retained as break-glass fallback only.
+
+**Prerequisites**:
+
+- Keycloak operational ✓ (Phase 3 Step 4 completed)
+- Apisix operational with TLS termination ✓ (Phase 3 Step 5 completed)
+- A Keycloak client `argocd` configured in the `lcn` realm
+- Argo CD configured with the OIDC settings pointing at Keycloak
+
+**To be promoted to formal step** when ready to start.
+
 ## Trasversali (qualunque fase)
 
+### Cosmetic drift on StatefulSet volumeClaimTemplates
+
+**Status**: Open, low priority, recurring pattern.
+
+**Context**: StatefulSets with `volumeClaimTemplates` (currently:
+`mongodb`, `etcd-standalone`) trigger cosmetic drift in Argo CD.
+The Kubernetes API server auto-populates `apiVersion: v1` and
+`kind: PersistentVolumeClaim` on each template entry, fields that
+are not present in the Git manifest. Argo CD reports this as
+`OutOfSync` even though the actual configuration matches.
+
+**Workaround**: add the two fields explicitly in the Git manifest's
+`volumeClaimTemplates` entries. Already applied to MongoDB. Pending
+for `platform/apisix/base/etcd-standalone.yaml`.
+
+**Proper fix (future)**: configure `ignoreDifferences` on the
+respective Argo CD Applications for paths
+`spec.volumeClaimTemplates[*].apiVersion` and
+`spec.volumeClaimTemplates[*].kind`. Centralized solution scaling
+to any future StatefulSet.
+
+### Backup e ripristino
+
 - [ ] Backup del cluster k3d: cosa salvare, dove, come ripristinare?
+
+### Promotion tra ambienti
+
 - [ ] Promotion via Git tra ambienti: quando attivare un secondo
       ambiente, come gestire il flusso `dev` -> `stage`?
+
+### Multi-cluster
+
 - [ ] Eventuale evoluzione a multi-cluster: si fa o no? (in caso, come
       simuliamo il pattern DCPP a tre cluster?)
-- [ ] Aggiornamento Argo CD a v3.x: pianificato per inizio Fase 3
-      (ADR-001 cita Argo CD 3.0.5 come versione DCPP target)
-- [ ] Monitoraggio della sopravvivenza del registry `docker.io/bitnamilegacy`
-      (cfr. ADR-002): verificare ogni 3-6 mesi se Broadcom ha annunciato
-      date di smantellamento. In tal caso, scrivere un ADR successivo
-      che superseda ADR-002 e definisca la nuova rotta.
-- [ ] Verifica preventiva di compatibilita' arm64 per ogni nuovo
-      componente di piattaforma o workload (cfr. ADR-003 driver
-      arm64). Da applicare a tutte le decisioni di Step 4
-      (Keycloak), Step 5 (Apisix), e Fase 4 (workload applicativi).
+
+### Aggiornamento Argo CD
+
+- [ ] Aggiornamento Argo CD a v3.x (ADR-001 cita Argo CD 3.0.5 come
+      versione DCPP target). La v2.13.3 in uso e' funzionale; valutare
+      se l'upgrade va fatto prima di Fase 4 o rimandato.
+
+### Monitoraggio Bitnami legacy
+
+- [ ] Monitoraggio della sopravvivenza del registry
+      `docker.io/bitnamilegacy` (cfr. ADR-002): verificare ogni
+      3-6 mesi se Broadcom ha annunciato date di smantellamento.
+      In tal caso, scrivere un ADR successivo che superseda ADR-002
+      e definisca la nuova rotta.
+
+### Verifica preventiva arm64
+
+- [ ] Driver arm64 (cfr. ADR-003) — gia' applicato a Step 4
+      (Keycloak), Step 5 (Apisix), etcd standalone. Da applicare
+      a tutte le decisioni di Fase 4 (workload applicativi) e
+      successive.
+
+### Argo CD: replace initial admin password
+
+**Status**: Postponed to Phase 5+ (will be obsolete after OIDC
+federation).
+
+**Context**: Currently Argo CD uses the auto-generated
+`argocd-initial-admin-secret`, regenerated at each cluster reset.
+The current operational pattern is: extract password after
+bootstrap, save to Bitwarden manually, repeat on every reset.
+
+**Future**: this becomes irrelevant once OIDC federation with
+Keycloak is configured (see Fase 5 — Argo CD OIDC integration).
+The local admin password remains only as break-glass.
+
+## External promotion strategy (post-MVP)
+
+**Status**: Documented intent, not actionable until milestone reached.
+
+**Trigger milestone**: Lab includes one or more end-to-end demo
+applications that exercise the full stack (Angular → Apisix →
+Spring Boot → MongoDB with OIDC via Keycloak). The demo apps should
+be designed to showcase both the architecture's strengths AND
+limitations — case studies that include honest discussion of where
+the pattern works and where it doesn't.
+
+**Channels (multi-channel approach)**:
+
+- **LinkedIn**: professional audience, focus on the methodology
+  angle (Architect+Engineer+Decision-maker pattern as a case study)
+- **Medium / dev.to**: technical audience, focus on the cloud-native
+  lab angle (rigorous ADR-driven development on Apple Silicon)
+- **Hacker News**: "Show HN" submission with the lab repository,
+  framed around the unique combination of methodology + cloud-native
+  discipline
+- **Reddit**: relevant subreddits — r/kubernetes (lab angle),
+  r/ClaudeAI (methodology angle), possibly r/devops
+
+**What makes this distinctive (per market research, May 2026)**:
+
+- The Architect+Engineer+Decision-maker pattern is documented
+  elsewhere as best practice, but rarely as a case study with
+  explicit failure episodes
+- Cloud-native labs on Apple Silicon exist, but typically as
+  tutorials — not as personal labs with enterprise-grade rigor
+  (ADRs, methodology, runbooks)
+- The combination of both, published as an honest narrative
+  including what went wrong, was not found elsewhere
+
+**Pre-promotion checklist** (to be executed when trigger milestone
+is reached):
+
+- [ ] All ADRs reviewed and finalized (no PROPOSED entries on
+      critical paths)
+- [ ] Methodology document finalized with full set of episodes
+- [ ] README polished for first-time visitors (clear "what / why /
+      how")
+- [ ] At least 2-3 demo apps documented as case studies
+- [ ] Repository topics and description tuned for discoverability
+- [ ] Decide on a canonical "anchor" article (likely Medium or
+      personal site) and link to it from LinkedIn / Reddit / HN
+      posts
+
+**To be revisited when milestone is reached**.
 
 ## Come usare questo file
 
@@ -161,45 +229,3 @@ Configure Apisix to point at the standalone etcd via
   lungo periodo.
 - Quando emergono nuove decisioni durante lo sviluppo, le aggiungi
   qui prima di passarle a Code per esecuzione.
-
-### External promotion strategy (post-MVP)
-
-**Status**: Documented intent, not actionable until milestone reached.
-
-**Trigger milestone**: Lab includes one or more end-to-end demo applications
-that exercise the full stack (Angular → Apisix → Spring Boot → MongoDB with
-OIDC via Keycloak). The demo apps should be designed to showcase both the
-architecture's strengths AND limitations — case studies that include
-honest discussion of where the pattern works and where it doesn't.
-
-**Channels (multi-channel approach)**:
-
-- **LinkedIn**: professional audience, focus on the methodology angle
-  (Architect+Engineer+Decision-maker pattern as a case study)
-- **Medium / dev.to**: technical audience, focus on the cloud-native lab
-  angle (rigorous ADR-driven development on Apple Silicon)
-- **Hacker News**: "Show HN" submission with the lab repository, framed
-  around the unique combination of methodology + cloud-native discipline
-- **Reddit**: relevant subreddits — r/kubernetes (lab angle), r/ClaudeAI
-  (methodology angle), possibly r/devops
-
-**What makes this distinctive (per market research, May 2026)**:
-
-- The Architect+Engineer+Decision-maker pattern is documented elsewhere as
-  best practice, but rarely as a case study with explicit failure episodes
-- Cloud-native labs on Apple Silicon exist, but typically as tutorials —
-  not as personal labs with enterprise-grade rigor (ADRs, methodology, runbooks)
-- The combination of both, published as an honest narrative including
-  what went wrong, was not found elsewhere
-
-**Pre-promotion checklist** (to be executed when trigger milestone is reached):
-
-- [ ] All ADRs reviewed and finalized (no PROPOSED entries on critical paths)
-- [ ] Methodology document finalized with full set of episodes
-- [ ] README polished for first-time visitors (clear "what / why / how")
-- [ ] At least 2-3 demo apps documented as case studies
-- [ ] Repository topics and description tuned for discoverability
-- [ ] Decide on a canonical "anchor" article (likely Medium or personal site)
-      and link to it from LinkedIn / Reddit / HN posts
-
-**To be revisited when milestone is reached**.

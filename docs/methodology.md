@@ -528,6 +528,51 @@ Decision-maker should adopt the same discipline.
 credential was sensitive. It's about building habits that scale to
 contexts where the credential matters.
 
+### Episode 11 — When the Architect is wrong, the data tells you first
+
+During Phase 3 Step 5 (Apache Apisix), the Architect formed a series
+of confident diagnoses that were each later contradicted by data:
+
+1. *"ArgoCD does not execute Helm hooks; the chart manifests are
+   applied as plain Kubernetes resources."* — Wrong. Argo CD does
+   recognize Helm hook annotations and maps them onto its own
+   PreSync/Sync/PostSync phases. The deadlock symptom was caused
+   precisely by this behavior.
+
+2. *"The Apisix Ingress Controller cannot read Secrets cross-namespace
+   due to missing RBAC."* — Wrong. The Service Account had the
+   permissions; `kubectl auth can-i` confirmed it. The actual cause
+   was a missing `GatewayProxy` CRD instance (introduced as a
+   breaking change in Ingress Controller v2.0).
+
+3. *"The chart is broken in subtle ways."* — Wrong. The chart was
+   working as designed; the design changed in v2.0 and the upgrade
+   guide documented it explicitly. The Architect had not consulted
+   the upgrade guide before scaffolding.
+
+The pattern across all three: the Architect held the first hypothesis
+with high confidence, designed a fix around it, and the Engineer
+either implemented the fix or asked for verification. In each case,
+the verification surfaced data that contradicted the hypothesis.
+
+**The signal**: when the Architect's hypotheses are contradicted in
+succession by data, the right response is not to formulate a fourth
+hypothesis. It is to stop, gather more data, and **reformulate the
+problem space**, not just the answer.
+
+**The rule applied since this episode**: when an Apisix-style
+architectural transition is in progress, read the upgrade guide
+before the install guide. When a chart shows breaking-change
+versions in its history, the upgrade guide is first-class
+documentation, not secondary.
+
+**Operational corollary**: the Architect should explicitly enumerate
+hypotheses (alpha, beta, gamma) before proposing a fix, and the
+Decision-maker should weight the cost of fix iteration against the
+cost of one more diagnostic pass. In this case, the diagnostic pass
+that revealed `GatewayProxy` was the right investment; the three
+fix iterations that preceded it were not.
+
 ---
 
 ## What stays in repo memory between sessions
