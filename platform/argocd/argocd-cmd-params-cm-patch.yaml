@@ -1,0 +1,28 @@
+# platform/argocd/argocd-cmd-params-cm-patch.yaml
+#
+# Patch al ConfigMap argocd-cmd-params-cm per la modalita' insecure.
+#
+# CONTESTO: ArgoCD v2.x legge i parametri runtime da argocd-cmd-params-cm,
+# NON da argocd-cm. Il flag server.insecure (=true) disabilita il redirect
+# HTTP→HTTPS del server e lo fa ascoltare in chiaro su port 80.
+# Questo e' il pattern corretto per ArgoCD dietro un TLS-terminating reverse
+# proxy (es. APISIX che termina TLS e fa ProxyPass su HTTP).
+#
+# COMPLEMENTARE a proxy-rewrite X-Forwarded-Proto: https in ApisixRoute
+# (platform/apisix/base/apisixroute-argocd.yaml) che serve per:
+#   - generazione corretta degli URL di redirect OAuth
+#   - verifica CSRF (Dex / OIDC callback)
+#
+# Ref: https://argo-cd.readthedocs.io/en/stable/operator-manual/ingress/
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-cmd-params-cm
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-cmd-params-cm
+    app.kubernetes.io/part-of: argocd
+data:
+  # Disabilita il redirect HTTP→HTTPS di argocd-server.
+  # TLS terminato da APISIX upstream; il backend serve HTTP su port 80.
+  server.insecure: "true"

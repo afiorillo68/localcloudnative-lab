@@ -4,6 +4,12 @@
 # NOTA: la ApisixRoute vive nel namespace del Service target (argocd),
 # non in platform-apisix. L'Ingress Controller di APISIX watcha
 # tutti i namespace per default.
+#
+# proxy-rewrite inietta X-Forwarded-Proto: https perche' APISIX termina
+# TLS e fa ProxyPass su HTTP. Senza questo header, ArgoCD genera URL di
+# redirect OAuth/OIDC con schema http:// invece di https://, causando
+# errori di CSRF e callback falliti.
+# Ref: https://argo-cd.readthedocs.io/en/stable/operator-manual/ingress/
 apiVersion: apisix.apache.org/v2
 kind: ApisixRoute
 metadata:
@@ -23,3 +29,10 @@ spec:
           servicePort: 80
       # Argo CD richiede WebSocket per la UI live
       websocket: true
+      plugins:
+        - name: proxy-rewrite
+          enable: true
+          config:
+            headers:
+              set:
+                X-Forwarded-Proto: "https"

@@ -43,3 +43,10 @@ patches:
     target:
       kind: ConfigMap
       name: argocd-cm
+  # Patch runtime-params: server.insecure=true per modalita' reverse-proxy.
+  # ArgoCD legge i parametri del server da questo CM, non da argocd-cm.
+  # Necessario perche' APISIX termina TLS e fa ProxyPass su HTTP port 80.
+  - path: argocd-cmd-params-cm-patch.yaml
+    target:
+      kind: ConfigMap
+      name: argocd-cmd-params-cm
