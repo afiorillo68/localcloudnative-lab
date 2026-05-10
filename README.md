@@ -55,14 +55,34 @@ your time:
 
 | Component | Status | Notes |
 |---|---|---|
-| k3d cluster | Running | Single-node, Traefik and servicelb disabled, port 80/443 mapped |
+| k3d cluster | Running | Single-node, Traefik disabled, port 80/443 mapped |
 | Argo CD v2.13.3 | Healthy | Self-managed via app-of-apps, accessible via `make argocd-ui` |
 | Sealed Secrets v0.36.6 | Healthy | Master key backed up in Bitwarden + Keychain |
 | MongoDB 7.0 | Healthy | Replica set rs0, single replica, pure Kustomize manifests (see ADR-003) |
-| Apache Apisix | In progress (awaiting TLS certificates) | Phase 3 — Step 5a scaffolded; deploy after Step 5b TLS SealedSecrets |
-| Keycloak | In progress (awaiting credentials) | Phase 3 — Step 4a scaffolded; deploy after Step 4b SealedSecrets |
+| Keycloak 26 | Healthy | Bitnami chart with PostgreSQL subchart, realm `lcn` imported, accessible via `make keycloak-ui` |
+| Apache Apisix 3.16.0 | Healthy | Standalone etcd backend (ADR-004), TLS edge termination via ApisixRoute (ADR-005) |
 | OpenSearch | Planned | Phase 5 — search and observability stack |
 | MinIO | Planned | Phase 6 — S3-compatible object storage |
+
+**Phase 3 closed**: 5 ADRs ratified, 13 methodology lessons accumulated,
+disaster recovery procedure validated end-to-end via cluster reset and
+SealedSecret master key restore.
+
+## Demo applications
+
+The platform hosts companion demo applications that exercise the
+end-to-end stack. Each demo is published in its own repository:
+
+- **[lcnpages-app](https://github.com/afiorillo68/lcnpages-app)** —
+  a Notion-like knowledge base demonstrating Spring Boot 4 + Angular 21,
+  MongoDB document storage, OIDC federation via Keycloak, and TLS
+  termination via Apisix. **Status**: scaffolding complete (Phase 4
+  Step 1A), Keycloak client and test user verified end-to-end (Phase
+  4 Step 1B), backend and frontend implementation in progress.
+
+Additional demos will be added as Phase 4 progresses, designed to
+exercise different facets of the platform (object storage,
+observability, AI/SLM workloads).
 
 ## Quick start
 
@@ -165,10 +185,16 @@ The relevant architectural decisions are documented as ADRs in
   components where it works.
 - **[ADR-003](docs/adr/0003-eccezione-mongodb-arm64.md)** — the
   MongoDB exception. Pure Kustomize manifests instead of Helm chart
-  because no Bitnami chart provides arm64 images, and Operator
-  alternatives are sproportionate for a single-node lab. Introduces a
-  new permanent decision driver: arm64 compatibility verified before
+  because no Bitnami chart provides arm64 images. Introduces a new
+  permanent decision driver: arm64 compatibility verified before
   every architectural ratification.
+- **[ADR-004](docs/adr/0004-apisix-etcd-standalone.md)** — Apisix
+  etcd standalone instead of Bitnami subchart, to work around an
+  Argo CD PreSync hook deadlock.
+- **[ADR-005](docs/adr/0005-apisix-tls-edge-termination.md)** — TLS
+  edge termination pattern with Apisix, including documented
+  backend-specific quirks for Argo CD and Keycloak that any future
+  workload behind Apisix will need to know about.
 
 Decisions identified but not yet ratified live in
 [`docs/adr/BACKLOG.md`](docs/adr/BACKLOG.md). Open architectural
@@ -217,17 +243,20 @@ Done:
 - [x] Phase 2 — Argo CD bootstrap with app-of-apps pattern
 - [x] Phase 3 — Sealed Secrets controller
 - [x] Phase 3 — MongoDB 7.0 with replica set and SCRAM auth
+- [x] Phase 3 — Keycloak with preconfigured realm
+- [x] Phase 3 — Apache Apisix as gateway with TLS edge termination
+- [x] Phase 4 Step 1A — `lcnpages-app` repository scaffolding (Spring Boot 4 + Angular 21)
+- [x] Phase 4 Step 1B — Keycloak client `lcnpages-frontend` configured, test user, OIDC flow verified
+- [x] Reorganization — split inline Phase 1/2 walkthroughs into `docs/setup/`
 
 In progress / planned:
 
-- [ ] Phase 3 — Keycloak with preconfigured realm
-- [ ] Phase 3 — Apache Apisix as gateway
-- [ ] Phase 4 — Spring Boot demo service (multi-arch arm64 build)
-- [ ] Phase 4 — Angular demo frontend
-- [ ] Phase 4 — End-to-end: Angular → Apisix → Spring Boot → MongoDB with Keycloak auth
+- [ ] Phase 4 Step 1C — Backend (Spring Boot resource server) and frontend (Angular SPA) implementation
+- [ ] Phase 4 Step 1D — Kubernetes deploy via Argo CD with TLS via Apisix
+- [ ] Phase 4 Step 2+ — Block editor, attachments, advanced search, AI features (post-MVP)
 - [ ] Phase 5 — OpenSearch and observability stack (optional, on-demand)
+- [ ] Phase 5 — Argo CD OIDC federation with Keycloak
 - [ ] Phase 6 — MinIO as Nutanix Objects equivalent
-- [x] Reorganization — split inline Phase 1/2 walkthroughs into `docs/setup/`
 - [ ] Architecture overview document (`docs/architecture.md`)
 
 ## Contributing

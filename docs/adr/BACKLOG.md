@@ -44,6 +44,79 @@ specific behavior becomes necessary.
 
 ## Fase 4 — Workloads applicativi
 
+### Step 1B Keycloak setup — completed
+
+**Status**: Completed (May 10, 2026).
+
+**What was configured**:
+
+- Client `lcnpages-frontend` in realm `lcn`: public OIDC client with
+  PKCE-S256 mandatory, Standard flow only, redirect URIs and Web
+  origins configured for both local development (`http://localhost:4200`)
+  and cluster deployment (`https://pages.lcn-lab.local`)
+- User `angelo` with credentials and verified email, no application
+  roles assigned yet (uses Keycloak default roles only)
+- Verified end-to-end: discovery endpoint, authorization code flow,
+  PKCE token exchange, JWT decoded and inspected via curl
+
+**Configuration is currently UI-only** (decision 4.20). A future task
+is to encode the same configuration as a JSON delta to the
+`keycloak-realm-config` ConfigMap, so that the configuration is
+GitOps-coherent and survives cluster resets. To be addressed before
+the trigger milestone for external promotion.
+
+### Step 1C open items — JWT audience handling
+
+**Status**: To be addressed at the start of Step 1C.
+
+**Context**: The access token issued by Keycloak for
+`lcnpages-frontend` carries `aud: "account"` rather than
+`aud: "lcnpages-frontend"`. By default, Spring Security as a resource
+server validates the audience against the configured client_id and
+would reject this token.
+
+**Two paths forward**:
+
+- **Lab-grade**: configure Spring Security to skip audience
+  validation. Simpler, acceptable for the lab.
+- **Production-grade**: add an audience mapper in Keycloak
+  (Client scopes → `lcnpages-frontend-dedicated` → Mappers →
+  "Audience" type) to inject a dedicated audience claim. Cleaner,
+  requires no Spring Security override.
+
+To be decided at the start of Step 1C.
+
+### Step 1C open items — Roles claim flattening
+
+**Status**: To be addressed at the start of Step 1C.
+
+**Context**: Keycloak nests roles under `realm_access.roles` in the
+JWT. Spring Security looks for authorities in a flat `authorities` or
+`scope` claim by default. Two solutions:
+
+- Custom `JwtAuthenticationConverter` in Spring Security that walks
+  `realm_access.roles` and exposes them as `GrantedAuthority` objects
+- Keycloak mapper that flattens the nested roles into a top-level
+  custom claim
+
+Recommendation for Step 1C: **JwtAuthenticationConverter**, since it
+keeps the Keycloak side standard and isolates the integration logic
+in the resource server.
+
+### Step 1C open items — Application-specific roles for `lcnpages`
+
+**Status**: Deferred to when the authorization model is clearer.
+
+**Context**: Currently `angelo` has only Keycloak system roles
+(`default-roles-lcn`, `offline_access`, `uma_authorization`). For
+`lcnpages` Step 1 with only per-user isolation, no role-based
+distinction is needed. When the application introduces concepts like
+"admin" vs "regular user" — or when other workloads in Phase 4 require
+realm roles — they will be defined as realm roles in Keycloak and
+assigned to users explicitly.
+
+Probably out of scope for Phase 4 Step 1.
+
 ### Naming dei namespace dei workloads
 
 - [ ] Pattern: `workloads-<dominio>` (es. `workloads-gis`,
@@ -155,6 +228,25 @@ to any future StatefulSet.
       (Keycloak), Step 5 (Apisix), etcd standalone. Da applicare
       a tutte le decisioni di Fase 4 (workload applicativi) e
       successive.
+
+### Keycloak: audience mapper come pattern ricorrente
+
+**Status**: Open, low priority, recurring pattern for any new client.
+
+**Context**: When adding a new OIDC client to Keycloak that issues
+access tokens for a custom resource server (Spring Boot, Node.js,
+etc.), the default audience claim points to `account` rather than the
+custom client. This is a Keycloak default that requires explicit
+override per-client.
+
+**Workaround**: add an "Audience" mapper to the client's dedicated
+scope. Will likely become a recurring task as more workloads are
+added in Phase 4+. Worth documenting as a runbook entry rather than
+a per-client decision.
+
+**Trigger**: when Step 1C ratifies the chosen approach for
+`lcnpages-frontend`, generalize the pattern into a runbook section
+(e.g. `docs/how-to/keycloak-add-oidc-client.md`).
 
 ### Argo CD: replace initial admin password
 

@@ -573,6 +573,91 @@ cost of one more diagnostic pass. In this case, the diagnostic pass
 that revealed `GatewayProxy` was the right investment; the three
 fix iterations that preceded it were not.
 
+### Episode 12 — Multi-command blocks hide cd failures
+
+While migrating both repositories from HTTPS to SSH for GitHub
+authentication, the Architect provided a block of commands beginning
+with `cd ~/Dropbox/Lavoro/lcn-lab/`. The Decision-maker pasted the
+entire block into a single shell prompt. The `cd` silently failed
+(probably a Dropbox sync hiccup or path mistype that produced no
+visible error), and the subsequent commands ran in the previous
+directory — `~/Dropbox/Lavoro/lcnpages-app/`.
+
+The result: `git remote set-url origin git@github.com:.../localcloudnative-lab.git`
+was applied to the wrong repository, and `git fetch` pulled the lab's
+history into `lcnpages-app`'s local checkout. The mistake was
+reversible only because no `git push` had occurred — the remote on
+GitHub was never touched.
+
+The error pattern is silent: nothing fails loudly, but the wrong
+remote gets overwritten. Five minutes of recovery for a five-second
+verification skipped.
+
+**Two countermeasures, both worth applying**:
+
+1. The Architect should chain commands with `cd ... && ...` so that
+   subsequent commands abort on `cd` failure. Better yet: provide the
+   block in the `cd ... &&` form even when intending a "single block of
+   work", because the protection costs nothing.
+2. The Decision-maker should execute the `cd` standalone and verify
+   with `pwd` before running any further command in the block. The
+   pattern "cd, pwd, then act" is a habit worth forming.
+
+**Lesson learned**: convenience syntax in shell (multi-line commands
+on one paste) silently trades safety for speed. When the cost of an
+error is non-trivial — even if recoverable, as in this case — the
+Architect should preempt the trade by chaining `&&` and the
+Decision-maker should resist the temptation to treat the block as a
+single atomic operation.
+
+### Episode 13 — When the UI fails, drop down to the protocol
+
+While testing the Keycloak setup for `lcnpages` (Phase 4 Step 1B),
+the Keycloak account console (`/realms/<realm>/account`) hung with an
+infinite loading spinner in Safari private mode. Diagnostic via Web
+Inspector revealed the cause: a `login-status-iframe` request returned
+HTTP 403 because Safari Intelligent Tracking Prevention (ITP) blocks
+cross-context cookies in private mode. The account console SPA cannot
+proceed without a successful session-status check from this iframe.
+
+The Architect's first instinct was to keep debugging the UI: try a
+non-private window, clear cookies, switch browsers. All valid moves,
+but they all assume "the UI is the test". A better instinct emerged:
+**bypass the UI entirely and verify the OIDC flow at the protocol
+level**.
+
+What the Decision-maker did instead:
+
+1. Constructed a hand-crafted authorization request URL with the
+   client_id, redirect_uri, PKCE challenge, and scope parameters.
+2. Loaded that URL in a new private window. Keycloak presented its
+   *login page* (not the account console SPA), which works fine in
+   Safari ITP because it doesn't rely on cross-context iframes.
+3. Logged in successfully and observed the redirect to localhost:4200
+   carrying the authorization `code`.
+4. Exchanged the code for an access token via `curl` against the
+   token endpoint, supplying the matching `code_verifier` to satisfy
+   PKCE.
+5. Decoded the JWT payload to inspect every claim.
+
+This bypass produced **higher-value verification** than the account
+console UI ever would have. We didn't just confirm "login works". We
+saw the issuer, subject, audience, scopes, roles, profile claims, and
+authorization metadata — exactly what Spring Boot will validate in
+Step 1C, and exactly what Angular will read after authentication.
+
+**The pattern to internalize**: when a layer of the UI fails for
+reasons unrelated to the actual feature (browser policy, CSS bug,
+loading order), and the underlying protocol is sound, dropping to the
+protocol gives both a workaround AND a deeper understanding. The cost
+is low (a single curl command), the benefit is high.
+
+**Lesson learned**: the Architect should resist the pull of "fix the
+UI we have" when "skip the UI we don't need" is available. Especially
+in diagnostic phases, the indirect path is often the direct path. A
+useful question to surface explicitly: "is the UI necessary for what
+we're verifying, or is it a convenience that's now in the way?"
+
 ---
 
 ## What stays in repo memory between sessions
